@@ -20,114 +20,145 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "imageNet.h"
+#include "detectNet.h"
+#include "detect_object.h"
 
-#include "commandLine.h"
-#include "loadImage.h"
-#include "cudaFont.h"
+#include "gstCamera.h"
+#include "glDisplay.h"
 
-#include <string>
-#include "string.h"
-#include <iostream>
-#include <fstream>
+#include "signal_handle.h"
+bool signal_recieved = false;
 
-imageNet* load_imageNet(char* modelname, char* dataset_path){
-
+/*
+* default 
+* model_name = ssd-mobilenet-v2
+* threshold
+*/
+detectNet* detectNet(char* modelName){
 	/*
-	 * create recognition network
+	 * create detect object network
 	 */
-	char* modelName = modelname;
-	char* prototxt = NULL;
-	std::string tmp = std::string(dataset_path) + "labels.txt";
-	char* labels   = const_cast<char*>(tmp.c_str());
-	const char* input    = "input_0";
-	const char* output   = "output_0";
+	imageNet* net;
+	float threshold = 0.0f;
 	int maxBatchSize = DEFAULT_MAX_BATCH_SIZE;
-	
-	imageNet* net = imageNet::Create(prototxt, modelName, NULL, labels, input, output, maxBatchSize);
+	if(strcasecmp(modelName, "ssd-mobilenet-v2") != 0){
+		char* prototxt = NULL;
+		const char* input    = NULL;
+		const char* output   = NULL;
 
+		const char* out_blob     = NULL;
+		const char* out_cvg      = NULL;
+		const char* out_bbox     = NULL;
+		const char* class_labels = NULL;
+		/*
+		std::string tmp = std::string(dataset_path) + "labels.txt";
+		char* labels   = const_cast<char*>(tmp.c_str());
+		*/
+		net = detectNet::Create(prototxt, modelName, meanPixel, class_labels, threshold, input, 
+							out_blob ? NULL : out_cvg, out_blob ? out_blob : out_bbox, maxBatchSize);
+	}
+	else{
+		net = detectNet::Create(NetworkTypeFromStr(modelName), threshold, maxBatchSize);
+	}
+	
 	return net;
 }
 
 
-int classify(char* inputfilename, char* outputfile, imageNet* net)
+int detect(detectNet* net)
 {
 	/*
-	 * check input filename
+	 * create the camera device
 	 */
-	char* imgFilename = inputfilename;
-	
-	if( !net )
+	int camera_width = 640;
+	int camera_height = 480;
+
+	gstCamera* camera = gstCamera::Create(camera_width,camera_height);
+	if( !camera )
 	{
-		printf("imagenet-console:   failed to initialize imageNet\n");
+		printf("\ndetectnet-camera:  failed to initialize camera device\n");
 		return 0;
 	}
 
+	/**
+	 * Parse a string sequence into OverlayFlags enum.
+	 * Valid flags are "none", "box", "label", and "conf" and it is possible to combine flags
+	 * (bitwise OR) together with commas or pipe (|) symbol.  For example, the string sequence
+	 * "box,label,conf" would return the flags `OVERLAY_BOX|OVERLAY_LABEL|OVERLAY_CONFIDENCE`.
+	 */
+	char* OverlayFlag = "box"
+	const uint32_t overlayFlags = detectNet::OverlayFlagsFromStr(OverlayFlag);
 
-	float* imgCPU    = NULL;
-	float* imgCUDA   = NULL;
-	int    imgWidth  = 0;
-	int    imgHeight = 0;
-		
-	if( !loadImageRGBA(imgFilename, (float4**)&imgCPU, (float4**)&imgCUDA, &imgWidth, &imgHeight) )
+
+
+	glDisplay* display = glDisplay::Create();
+	if( !display ) 
+		printf("detectnet-camera:  failed to create openGL display\n");
+	if( !camera->Open() )
 	{
-		printf("failed to load image '%s'\n", imgFilename);
+		printf("detectnet-camera:  failed to open camera for streaming\n");
 		return 0;
 	}
 	
-
+	printf("detectnet-camera:  camera open for streaming\n");
 
 	float confidence = 0.0f;
-	const int img_class = net->Classify(imgCUDA, imgWidth, imgHeight, &confidence);
 	
-	// overlay the classification on the image
-	if( img_class >= 0 )
+	while( !signal_recieved )
 	{
-		printf("imagenet-console:  '%s' -> %2.5f%% class #%i (%s)\n", imgFilename, confidence * 100.0f, img_class, net->GetClassDesc(img_class));
+		// capture RGBA image
+		float* imgRGBA = NULL;
+		
+		if( !camera->CaptureRGBA(&imgRGBA, 1000) )
+			printf("detectnet-camera:  failed to capture RGBA image from camera\n");
+
+		// detect objects in the frame
+		detectNet::Detection* detections = NULL;
 	
-		char* outputFilename = outputfile;
+		const int numDetections = net->Detect(imgRGBA, camera->GetWidth(), camera->GetHeight(), &detections, overlayFlags);
 		
-		if( outputFilename != NULL )
+		if( numDetections > 0 )
 		{
-			// use font to draw the class description
-			cudaFont* font = cudaFont::Create(adaptFontSize(imgWidth));
-			
-			if( font != NULL )
-			{
-				char str[512];
-				sprintf(str, "%2.3f%% %s", confidence * 100.0f, net->GetClassDesc(img_class));
-
-				font->OverlayText((float4*)imgCUDA, imgWidth, imgHeight, (const char*)str, 10, 10,
-							   make_float4(255, 255, 255, 255), make_float4(0, 0, 0, 100));
-			}
-
-			// wait for GPU to complete work			
-			CUDA(cudaDeviceSynchronize());
-
-			// print out performance info
-			net->PrintProfilerTimes();
-
-			// save the output image to disk
-			printf("imagenet-console:  attempting to save output image to '%s'\n", outputFilename);
-			
-			if( !saveImageRGBA(outputFilename, (float4*)imgCPU, imgWidth, imgHeight) )
-				printf("imagenet-console:  failed to save output image to '%s'\n", outputFilename);
-			else
-				printf("imagenet-console:  completed saving '%s'\n", outputFilename);
-		}
-	}
-	else
-		printf("imagenet-console:  failed to classify '%s'  (result=%i)\n", imgFilename, img_class);
+			printf("%i objects detected\n", numDetections);
 		
-	CUDA(cudaFreeHost(imgCPU));
-/*
-	printf("imagenet-console:  shutting down...\n");
+			for( int n=0; n < numDetections; n++ )
+			{
+				printf("detected obj %i  class #%u (%s)  confidence=%f\n", n, detections[n].ClassID, net->GetClassDesc(detections[n].ClassID), detections[n].Confidence);
+				printf("bounding box %i  (%f, %f)  (%f, %f)  w=%f  h=%f\n", n, detections[n].Left, detections[n].Top, detections[n].Right, detections[n].Bottom, detections[n].Width(), detections[n].Height()); 
+			}
+		}	
 
-	CUDA(cudaFreeHost(imgCPU));
+		// update display
+		if( display != NULL )
+		{
+			// render the image
+			display->RenderOnce(imgRGBA, camera->GetWidth(), camera->GetHeight());
+
+			// update the status bar
+			char str[256];
+			sprintf(str, "TensorRT %i.%i.%i | %s | Network %.0f FPS", NV_TENSORRT_MAJOR, NV_TENSORRT_MINOR, NV_TENSORRT_PATCH, precisionTypeToStr(net->GetPrecision()), net->GetNetworkFPS());
+			display->SetTitle(str);
+
+			// check if the user quit
+			if( display->IsClosed() )
+				signal_recieved = true;
+		}
+
+		// print out timing info
+		net->PrintProfilerTimes();
+	}
+	
+
+	/*
+	 * destroy resources
+	 */
+	printf("detectnet-camera:  shutting down...\n");
+	
+	SAFE_DELETE(camera);
+	SAFE_DELETE(display);
 	SAFE_DELETE(net);
 
-	printf("imagenet-console:  shutdown complete\n");
-*/
+	printf("detectnet-camera:  shutdown complete.\n");
 
 	return 0;
 }

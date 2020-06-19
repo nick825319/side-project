@@ -24,8 +24,8 @@
 
 #include "detectNet.h"
 
-detectNet* load_detectNet(char* modelname = "resnet18.onnx", char* dataset_path = "/home/nick/datasets/cat_dog/");
-int classify(char* inputfilename, char* outputfile, imageNet* net);
+detectNet* load_detectNet(char* modelName = "ssd-mobilenet-v2");
+int detect(detectNet* net);
 
 #endif
 

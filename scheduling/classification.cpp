@@ -22,7 +22,6 @@
 
 #include "imageNet.h"
 
-#include "commandLine.h"
 #include "loadImage.h"
 #include "cudaFont.h"
 
