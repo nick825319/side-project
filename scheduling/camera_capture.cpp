@@ -19,18 +19,16 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+#include "signal_handle.h"
 
 #include "camera_capture.h"
 #include "gstCamera.h"
 #include "cudaMappedMemory.h"
 
-#include "signal_handle.h"
 #include "imageIO.h"
-
 #include <iostream>
 #include <chrono>
 #include <unistd.h>
-bool SIGNAL_RECIEVED = false;
 void print(){
 	printf("test string");
 	

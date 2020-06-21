@@ -27,14 +27,12 @@
 #include "glDisplay.h"
 
 #include "signal_handle.h"
-bool signal_recieved = false;
-
 /*
 * default 
 * model_name = ssd-mobilenet-v2
 * threshold
 */
-detectNet* detectNet(char* modelName){
+detectNet* load_detectNet(char* modelName){
 	/*
 	 * create detect object network
 	 */
@@ -45,7 +43,7 @@ detectNet* detectNet(char* modelName){
 		char* prototxt = NULL;
 		const char* input    = NULL;
 		const char* output   = NULL;
-
+		float meanPixel = 0.0f;
 		const char* out_blob     = NULL;
 		const char* out_cvg      = NULL;
 		const char* out_bbox     = NULL;
@@ -58,7 +56,7 @@ detectNet* detectNet(char* modelName){
 							out_blob ? NULL : out_cvg, out_blob ? out_blob : out_bbox, maxBatchSize);
 	}
 	else{
-		net = detectNet::Create(NetworkTypeFromStr(modelName), threshold, maxBatchSize);
+		net = detectNet::Create(detectNet::NetworkTypeFromStr(modelName), threshold, maxBatchSize);
 	}
 	
 	return net;
@@ -86,7 +84,7 @@ int detect(detectNet* net)
 	 * (bitwise OR) together with commas or pipe (|) symbol.  For example, the string sequence
 	 * "box,label,conf" would return the flags `OVERLAY_BOX|OVERLAY_LABEL|OVERLAY_CONFIDENCE`.
 	 */
-	char* OverlayFlag = "box"
+	char* OverlayFlag = "box";
 	const uint32_t overlayFlags = detectNet::OverlayFlagsFromStr(OverlayFlag);
 
 
@@ -104,7 +102,7 @@ int detect(detectNet* net)
 
 	float confidence = 0.0f;
 	
-	while( !signal_recieved )
+	while( !SIGNAL_RECIEVED )
 	{
 		// capture RGBA image
 		float* imgRGBA = NULL;
@@ -141,7 +139,7 @@ int detect(detectNet* net)
 
 			// check if the user quit
 			if( display->IsClosed() )
-				signal_recieved = true;
+				SIGNAL_RECIEVED = true;
 		}
 
 		// print out timing info

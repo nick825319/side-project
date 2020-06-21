@@ -26,9 +26,10 @@
 #include "signal_handle.h"
 #include "transferor.h"
 #include "delete_imagefile.h"
-#include "delete_object.h"
 
 #include "classification.h"
+#include "detect_object.h"
+
 #include <signal.h>
 #include <cstring>
 #include <string>
@@ -37,7 +38,8 @@
 #include <algorithm>
 
 gstCamera* camera;
-imageNet* net;
+detectNet* net;
+//imageNet* net
 int STOPSING = 0;
 void signHandler(int dummy) {
     SAFE_DELETE(camera);
@@ -78,9 +80,10 @@ int main( int argc, char** argv )
 	std::chrono::system_clock::time_point endTime;
 
 	//camera = initalize_camera();
-	//net = load_imageNet();
+	//imageNet* net = load_imageNet();
+	  net = load_detectNet();
 
-	exist_new_model(ipAddress ,model_port);
+	//exist_new_model(ipAddress ,model_port);
 	for(int i=0 ; i<1; i++){
 		/*
 			task1-imageCapture
@@ -138,9 +141,7 @@ int main( int argc, char** argv )
 
 			
 			//	task4-classify
-			
-/*
-			startTime = std::chrono::system_clock::now();
+			/*startTime = std::chrono::system_clock::now();
 			std::string filename = "Image-1588576875376.JPEG";
 			std::string inputfilename = "imageCapture/" + filename;
 			std::string outfilename = "classify_result/" + filename;
@@ -151,6 +152,9 @@ int main( int argc, char** argv )
 			delta = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
 			std::cout << "classify() response time (milli) : " << delta << std::endl;
 			write_responseTime(delta ,std::string("classify() response time"));*/
+
+			//	task5-detect object
+			detect(net);
 		}
 	}
 	return 0;
