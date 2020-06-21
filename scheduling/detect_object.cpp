@@ -38,7 +38,7 @@ detectNet* detectNet(char* modelName){
 	/*
 	 * create detect object network
 	 */
-	imageNet* net;
+	detectNet* net;
 	float threshold = 0.0f;
 	int maxBatchSize = DEFAULT_MAX_BATCH_SIZE;
 	if(strcasecmp(modelName, "ssd-mobilenet-v2") != 0){

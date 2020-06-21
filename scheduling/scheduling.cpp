@@ -26,6 +26,7 @@
 #include "signal_handle.h"
 #include "transferor.h"
 #include "delete_imagefile.h"
+#include "delete_object.h"
 
 #include "classification.h"
 #include <signal.h>
