@@ -29,16 +29,6 @@
 #include <iostream>
 #include <chrono>
 #include <unistd.h>
-void print(){
-	printf("test string");
-	
-}
-
-gstCamera* initalize_camera(int d_width,int d_height,char* cameraIndex){
-
-	gstCamera* camera = gstCamera::Create(d_width, d_height, cameraIndex);
-	return camera;
-}
 
 int imageCapture(gstCamera* cam)
 {

@@ -36,6 +36,7 @@ detectNet* load_detectNet(char* modelName){
 	/*
 	 * create detect object network
 	 */
+
 	detectNet* net;
 	float threshold = 0.0f;
 	int maxBatchSize = DEFAULT_MAX_BATCH_SIZE;
@@ -63,15 +64,11 @@ detectNet* load_detectNet(char* modelName){
 }
 
 
-int detect(detectNet* net)
+int detect(detectNet* net, gstCamera* camera, glDisplay* display)
 {
 	/*
 	 * create the camera device
 	 */
-	int camera_width = 640;
-	int camera_height = 480;
-
-	gstCamera* camera = gstCamera::Create(camera_width,camera_height);
 	if( !camera )
 	{
 		printf("\ndetectnet-camera:  failed to initialize camera device\n");
@@ -84,12 +81,9 @@ int detect(detectNet* net)
 	 * (bitwise OR) together with commas or pipe (|) symbol.  For example, the string sequence
 	 * "box,label,conf" would return the flags `OVERLAY_BOX|OVERLAY_LABEL|OVERLAY_CONFIDENCE`.
 	 */
-	char* OverlayFlag = "box";
+	char* OverlayFlag = "label";
 	const uint32_t overlayFlags = detectNet::OverlayFlagsFromStr(OverlayFlag);
 
-
-
-	glDisplay* display = glDisplay::Create();
 	if( !display ) 
 		printf("detectnet-camera:  failed to create openGL display\n");
 	if( !camera->Open() )
@@ -98,8 +92,6 @@ int detect(detectNet* net)
 		return 0;
 	}
 	
-	printf("detectnet-camera:  camera open for streaming\n");
-
 	float confidence = 0.0f;
 	
 	while( !SIGNAL_RECIEVED )
@@ -150,13 +142,14 @@ int detect(detectNet* net)
 	/*
 	 * destroy resources
 	 */
-	printf("detectnet-camera:  shutting down...\n");
+	
+	/*printf("detectnet-camera:  shutting down...\n");
 	
 	SAFE_DELETE(camera);
 	SAFE_DELETE(display);
 	SAFE_DELETE(net);
 
-	printf("detectnet-camera:  shutdown complete.\n");
+	printf("detectnet-camera:  shutdown complete.\n");*/
 
 	return 0;
 }

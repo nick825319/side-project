@@ -37,12 +37,15 @@
 #include <chrono>
 #include <algorithm>
 
+bool SIGNAL_RECIEVED = false;
 gstCamera* camera;
+glDisplay* display;
 detectNet* net;
 //imageNet* net
 int STOPSING = 0;
-void signHandler(int dummy) {
+void signHandler(int dummy){
     SAFE_DELETE(camera);
+	SAFE_DELETE(display);
 	SAFE_DELETE(net);
 	STOPSING = 1 ;
 
@@ -52,7 +55,18 @@ void signHandler(int dummy) {
                s_datetime.end());
 	std::string s = "----stop----";	
 	write_responseTime(0, s + s_datetime );
+	std::cout << "stop process , safe release memory" << std::endl;
 }
+
+glDisplay* create_display(){
+	display = glDisplay::Create();
+	return display;
+}
+gstCamera* initalize_camera(int d_width,int d_height,char* cameraIndex){
+	camera = gstCamera::Create(d_width, d_height, cameraIndex);
+	return camera;
+}
+
 
 void write_responseTime(int delta, std::string taskname){
 	std::ofstream file;
@@ -79,9 +93,10 @@ int main( int argc, char** argv )
 	std::chrono::system_clock::time_point startTime;
 	std::chrono::system_clock::time_point endTime;
 
-	//camera = initalize_camera();
+	camera = initalize_camera();
+	display = create_display();
 	//imageNet* net = load_imageNet();
-	  net = load_detectNet();
+	net = load_detectNet();
 
 	//exist_new_model(ipAddress ,model_port);
 	for(int i=0 ; i<1; i++){
@@ -120,7 +135,7 @@ int main( int argc, char** argv )
 			
 			startTime = std::chrono::system_clock::now();
 
-			request_model(ipAddress ,model_port);
+			//request_model(ipAddress ,model_port);
 
 			endTime = std::chrono::system_clock::now();
 			delta = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
@@ -154,7 +169,7 @@ int main( int argc, char** argv )
 			write_responseTime(delta ,std::string("classify() response time"));*/
 
 			//	task5-detect object
-			detect(net);
+			detect(net, camera, display);
 		}
 	}
 	return 0;
