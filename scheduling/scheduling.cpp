@@ -28,6 +28,7 @@
 #include "delete_imagefile.h"
 
 #include "classification.h"
+#include "pi_msg_receiver.h"
 #include "detect_object.h"
 
 #include <signal.h>
@@ -36,6 +37,10 @@
 #include <iostream>
 #include <chrono>
 #include <algorithm>
+#include <stdlib.h> 
+
+#define isOpenCam  0
+#define isLoadNet  0
 
 bool SIGNAL_RECIEVED = false;
 gstCamera* camera;
@@ -44,9 +49,13 @@ detectNet* net;
 //imageNet* net
 int STOPSING = 0;
 void signHandler(int dummy){
-    SAFE_DELETE(camera);
-	SAFE_DELETE(display);
-	SAFE_DELETE(net);
+	if(isOpenCam == 1){
+    	SAFE_DELETE(camera);
+		SAFE_DELETE(display);
+	}
+	if(isLoadNet == 1)
+		SAFE_DELETE(net);
+
 	STOPSING = 1 ;
 
 	std::time_t t = std::time(0);   // get time now
@@ -56,6 +65,7 @@ void signHandler(int dummy){
 	std::string s = "----stop----";	
 	write_responseTime(0, s + s_datetime );
 	std::cout << "stop process , safe release memory" << std::endl;
+	exit(0);
 }
 
 glDisplay* create_display(){
@@ -87,16 +97,22 @@ void write_responseTime(int delta, std::string taskname){
 int main( int argc, char** argv )
 {
 	char* ipAddress = "140.122.185.98";
+	char* PiIpAddress = "140.122.184.239";
+	char* selfIpAddress = "140.122.184.103";
 	uint16_t port = 12000;
 	uint16_t model_port = 12100;
+	uint16_t piPort = 15200;
 	int delta;
 	std::chrono::system_clock::time_point startTime;
 	std::chrono::system_clock::time_point endTime;
 
-	camera = initalize_camera();
-	display = create_display();
-	//imageNet* net = load_imageNet();
-	net = load_detectNet();
+	if(isOpenCam == 1){
+		camera = initalize_camera();
+		display = create_display();
+	}
+	if(isLoadNet == 1){
+		net = load_detectNet();
+	}
 
 	//exist_new_model(ipAddress ,model_port);
 	for(int i=0 ; i<1; i++){
@@ -169,7 +185,12 @@ int main( int argc, char** argv )
 			write_responseTime(delta ,std::string("classify() response time"));*/
 
 			//	task5-detect object
-			detect(net, camera, display);
+			//detect(net, camera, display);
+
+			// task6 - get piCam detection from composer
+			piMsgReceive(selfIpAddress,  piPort);	
+
+					
 		}
 	}
 	return 0;

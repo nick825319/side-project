@@ -2,6 +2,9 @@
 #include "pi_msg_receiver.h"
 
 #include "Socket.h"
+#include <string>
+#include <iostream>
+#include <strings.h>
 
 
 int piMsgReceive(char* ipAddress, uint16_t port){
@@ -9,17 +12,17 @@ int piMsgReceive(char* ipAddress, uint16_t port){
 	/*
 	* using jetson-utils network Socket.h 
 	*/
-	
+	uint64_t timeout = 120;
 	SocketType TCP_type =  SOCKET_TCP;	
 
 	Socket* socket = socket->Create(SOCKET_TCP);
 	std::cout<<"socket Created"<< std::endl;
-	socket->Connect(ipAddress, port);
-	
+	socket->Bind(ipAddress, port);
+	socket->Accept();
 	// dont use std::string send by socket send, cus encode way and padding will cause error
 	
-	socket->Send(tmpstring, mes_buffer.length(), static_cast<uint32_t>(std::stoul(ipAddress)), port);
-	std::cout << tmpstring << std::endl;
+	//socket->Send(tmpstring, mes_buffer.length(), static_cast<uint32_t>(std::stoul(ipAddress)), port);
+	//std::cout << tmpstring << std::endl;
 
 	int receive_buffersize = 1024;
 	uint8_t* buff =  new uint8_t[receive_buffersize];
@@ -30,16 +33,12 @@ int piMsgReceive(char* ipAddress, uint16_t port){
 
 		bzero(buff,sizeof(buff));
 		socket->Recieve(buff, receive_buffersize, NULL, NULL);
-
-		std::string tmp(buff, buff+receive_buffersize);
-
-		std::cout << tmp << std::endl;
-		if(tmp.find("person") != std::string::npos){
-			tmp.c		
+		std::cout << buff << std::endl;
+		while(1){
+			bzero(buff,sizeof(buff));
+			socket->Recieve(buff, receive_buffersize, NULL, NULL);
+			std::cout << buff << std::endl;
 		}
-	
-		bzero(buff,sizeof(buff));
-		bzero(&tmp,sizeof(tmp));
 	}
 	else{
 	std::cout << "unrecognized token" << std::endl;

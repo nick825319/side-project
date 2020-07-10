@@ -38,13 +38,13 @@ detectNet* load_detectNet(char* modelName){
 	 */
 
 	detectNet* net;
-	float threshold = 0.0f;
+	float threshold = 0.5f;
 	int maxBatchSize = DEFAULT_MAX_BATCH_SIZE;
 	if(strcasecmp(modelName, "ssd-mobilenet-v2") != 0){
 		char* prototxt = NULL;
 		const char* input    = NULL;
 		const char* output   = NULL;
-		float meanPixel = 0.0f;
+		float meanPixel = 1.0f;
 		const char* out_blob     = NULL;
 		const char* out_cvg      = NULL;
 		const char* out_bbox     = NULL;
