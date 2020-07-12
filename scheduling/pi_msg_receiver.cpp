@@ -21,7 +21,6 @@ int piMsgReceive(char* ipAddress, uint16_t port){
 	socket->Accept();
 
 	std::string mes_buffer = "GOTLABEL" ;
-	mes_buffer = mes_buffer + std::to_string(length);
 	char* tmpstring = const_cast<char*>(mes_buffer.c_str());
 
 	// dont use std::string send by socket send, cus encode way and padding will cause error
@@ -36,7 +35,7 @@ int piMsgReceive(char* ipAddress, uint16_t port){
 		socket->Recieve(buff, receive_buffersize, NULL, NULL);
 		std::cout << buff << std::endl;
 
-		socket->Send(buffer, length, static_cast<uint32_t>(std::stoul(ipAddress)), port);
+		socket->Send(tmpstring, mes_buffer.length, static_cast<uint32_t>(std::stoul(ipAddress)), port);
 	}
 	
 
