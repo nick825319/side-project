@@ -19,35 +19,34 @@ int piMsgReceive(char* ipAddress, uint16_t port){
 	std::cout<<"socket Created"<< std::endl;
 	socket->Bind(ipAddress, port);
 	socket->Accept();
+
+	std::string mes_buffer = "GOTLABEL" ;
+	mes_buffer = mes_buffer + std::to_string(length);
+	char* tmpstring = const_cast<char*>(mes_buffer.c_str());
+
 	// dont use std::string send by socket send, cus encode way and padding will cause error
-	
 	//socket->Send(tmpstring, mes_buffer.length(), static_cast<uint32_t>(std::stoul(ipAddress)), port);
 	//std::cout << tmpstring << std::endl;
 
 	int receive_buffersize = 1024;
 	uint8_t* buff =  new uint8_t[receive_buffersize];
-	socket->Recieve(buff, receive_buffersize, NULL, NULL);
-	std::string tmp(buff, buff+receive_buffersize);
-	if(tmp.find("PI_DETECT") != std::string::npos){
-		std::cout << "receive PI Detect Objects" << std::endl;
 
+	while(1){
 		bzero(buff,sizeof(buff));
 		socket->Recieve(buff, receive_buffersize, NULL, NULL);
 		std::cout << buff << std::endl;
-		while(1){
-			bzero(buff,sizeof(buff));
-			socket->Recieve(buff, receive_buffersize, NULL, NULL);
-			std::cout << buff << std::endl;
-		}
+
+		socket->Send(buffer, length, static_cast<uint32_t>(std::stoul(ipAddress)), port);
 	}
-	else{
-	std::cout << "unrecognized token" << std::endl;
-		std::string bye = "BYE";
-		char* byestring = const_cast<char*>(bye.c_str());
-		socket->Send(byestring, sizeof(byestring)-1, static_cast<uint32_t>(std::stoul(ipAddress)), port);
-		delete socket;
 	
-	}
+
+	// std::cout << "unrecognized token" << std::endl;
+	// 	std::string bye = "BYE";
+	// 	char* byestring = const_cast<char*>(bye.c_str());
+	// 	socket->Send(byestring, sizeof(byestring)-1, static_cast<uint32_t>(std::stoul(ipAddress)), port);
+	// 	delete socket;
+	
+
 	return 1;			
 }
 
