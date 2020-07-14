@@ -39,8 +39,8 @@
 #include <algorithm>
 #include <stdlib.h> 
 
-#define isOpenCam  0
-#define isLoadNet  0
+#define isOpenCam  1
+#define isLoadNet  1
 
 bool SIGNAL_RECIEVED = false;
 gstCamera* camera;
@@ -49,13 +49,6 @@ detectNet* net;
 //imageNet* net
 int STOPSING = 0;
 void signHandler(int dummy){
-	if(isOpenCam == 1){
-    	SAFE_DELETE(camera);
-		SAFE_DELETE(display);
-	}
-	if(isLoadNet == 1)
-		SAFE_DELETE(net);
-
 	STOPSING = 1 ;
 
 	std::time_t t = std::time(0);   // get time now
@@ -64,6 +57,13 @@ void signHandler(int dummy){
                s_datetime.end());
 	std::string s = "----stop----";	
 	write_responseTime(0, s + s_datetime );
+
+	if(isOpenCam == 1){
+    	SAFE_DELETE(camera);
+		SAFE_DELETE(display);
+	}
+	if(isLoadNet == 1)
+		SAFE_DELETE(net);
 	std::cout << "stop process , safe release memory" << std::endl;
 	exit(0);
 }
@@ -185,14 +185,15 @@ int main( int argc, char** argv )
 			write_responseTime(delta ,std::string("classify() response time"));*/
 
 			//	task5-detect object
-			//detect(net, camera, display);
+			detect(net, camera, display);
 
 			// task6 - get piCam detection from composer
-			piMsgReceive(selfIpAddress,  piPort);	
+			//piMsgReceive(selfIpAddress,  piPort);	
 
 					
 		}
 	}
+	std::cout << "exit delta :" << delta << std::endl;
 	return 0;
 }
 
