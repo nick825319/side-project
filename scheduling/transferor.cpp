@@ -122,7 +122,7 @@ int transfer_image(const char* imgPath, char* ipAddress, uint16_t port){
 	*/
 				
 }
-int request_model(char* ipAddress, uint16_t port){
+int request_model(char* ipAddress, uint16_t port, char* saved_modelName){
 	SocketType TCP_type =  SOCKET_TCP;	
 
 	Socket* socket = socket->Create(SOCKET_TCP);
@@ -156,7 +156,7 @@ int request_model(char* ipAddress, uint16_t port){
 			socket->Send(const_cast<char*>(mes_buffer.c_str()), mes_buffer.length(), static_cast<uint32_t>(std::stoul(ipAddress)), port);
 
 			std::ofstream file;
-			std::string filename = "resnet18.onnx";
+			std::string filename(saved_modelName);
 			file.open(filename,std::ofstream::out | std::ofstream::binary);
 			std::cout<<"writing file ..." << std::endl;
 			uint8_t* buff =  new uint8_t[rescive_buffersize];

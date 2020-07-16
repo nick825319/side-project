@@ -5,7 +5,7 @@
 
 
 int transfer_image(const char* imgPath, char* ipAddress , uint16_t port);
-int request_model(char* ipAddress, uint16_t port);
+int request_model(char* ipAddress, uint16_t port, char* saved_modelName);
 int exist_new_model(char* ipAddress, uint16_t port);
 std::string get_file_md5(std::string filename);
 std::string create_image_filename();

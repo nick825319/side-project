@@ -39,8 +39,8 @@
 #include <algorithm>
 #include <stdlib.h> 
 
-#define isOpenCam  1
-#define isLoadNet  1
+#define isOpenCam  0
+#define isLoadNet  0
 
 bool SIGNAL_RECIEVED = false;
 gstCamera* camera;
@@ -151,7 +151,7 @@ int main( int argc, char** argv )
 			
 			startTime = std::chrono::system_clock::now();
 
-			//request_model(ipAddress ,model_port);
+			//request_model(ipAddress, model_port, "mb2-ssd-lite.onnx");
 
 			endTime = std::chrono::system_clock::now();
 			delta = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
@@ -185,10 +185,10 @@ int main( int argc, char** argv )
 			write_responseTime(delta ,std::string("classify() response time"));*/
 
 			//	task5-detect object
-			detect(net, camera, display);
+			//detect(net, camera, display);
 
 			// task6 - get piCam detection from composer
-			//piMsgReceive(selfIpAddress,  piPort);	
+			piMsgReceive(selfIpAddress,  piPort);	
 
 					
 		}
