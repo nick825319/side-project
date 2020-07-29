@@ -20,7 +20,7 @@ fig = plt.figure(figsize=(10,5))
 ax = fig.add_subplot()
 
 ax.set_xlabel('excution')
-ax.set_ylabel('transfer_time(sce)')
+ax.set_ylabel('transfer_time(sec)')
 ax.set_title('composer_transfer_time')
 
 plt.xticks(np.arange(0, 500, 10), rotation=60)

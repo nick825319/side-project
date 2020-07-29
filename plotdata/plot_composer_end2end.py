@@ -20,7 +20,7 @@ fig = plt.figure(figsize=(10,5))
 ax = fig.add_subplot()
 
 ax.set_xlabel('excution')
-ax.set_ylabel('end2end_respond(sce)')
+ax.set_ylabel('end2end_respond(sec)')
 ax.set_title('composer_end2end')
 print(min(fdata))
 print(max(fdata))
