@@ -46,7 +46,6 @@ int imageCapture(gstCamera* cam)
 	printf("\ncameraCapture: successfully open camera device\n");
 	printf("    width:  %u\n", width);
 	printf("   height:  %u\n", height);
-	printf("    depth:  %u (bpp)\n\n", camera->GetPixelDepth());
 
 	/*
 	 * start streaming
@@ -111,7 +110,6 @@ int period_capture(gstCamera* cam){
 		printf("\ncameraCapture: successfully open camera device\n");
 		printf("    width:  %u\n", width);
 		printf("   height:  %u\n", height);
-		printf("    depth:  %u (bpp)\n\n", camera->GetPixelDepth());
 
 		/*
 		 * start streaming

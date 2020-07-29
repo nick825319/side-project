@@ -32,7 +32,7 @@
 * model_name = ssd-mobilenet-v2
 * threshold
 */
-detectNet* load_detectNet(char* modelName){
+detectNet* load_detectNet(char* modelName, char* dataset_path){
 	/*
 	 * create detect object network
 	 */
@@ -42,17 +42,16 @@ detectNet* load_detectNet(char* modelName){
 	int maxBatchSize = DEFAULT_MAX_BATCH_SIZE;
 	if(strcasecmp(modelName, "ssd-mobilenet-v2") != 0){
 		char* prototxt = NULL;
-		const char* input    = NULL;
+		const char* input    = "input_0";
 		const char* output   = NULL;
 		float meanPixel = 1.0f;
 		const char* out_blob     = NULL;
-		const char* out_cvg      = NULL;
-		const char* out_bbox     = NULL;
-		const char* class_labels = NULL;
-		/*
+		const char* out_cvg      = "scores";
+		const char* out_bbox     = "boxes";
+		
 		std::string tmp = std::string(dataset_path) + "labels.txt";
-		char* labels   = const_cast<char*>(tmp.c_str());
-		*/
+		const char* class_labels   = const_cast<char*>(tmp.c_str());
+		
 		net = detectNet::Create(prototxt, modelName, meanPixel, class_labels, threshold, input, 
 							out_blob ? NULL : out_cvg, out_blob ? out_blob : out_bbox, maxBatchSize);
 	}
@@ -94,63 +93,48 @@ int detect(detectNet* net, gstCamera* camera, glDisplay* display)
 	
 	float confidence = 0.0f;
 	
-	while( !SIGNAL_RECIEVED )
+	
+	// capture RGBA image
+	float* imgRGBA = NULL;
+	
+	if( !camera->CaptureRGBA(&imgRGBA) )
+		printf("detectnet-camera:  failed to capture RGBA image from camera\n");
+/*
+	// detect objects in the frame
+	detectNet::Detection* detections = NULL;
+
+	const int numDetections = net->Detect(imgRGBA, camera->GetWidth(), camera->GetHeight(), &detections, overlayFlags);
+	
+	if( numDetections > 0 )
 	{
-		// capture RGBA image
-		float* imgRGBA = NULL;
-		
-		if( !camera->CaptureRGBA(&imgRGBA, 1000) )
-			printf("detectnet-camera:  failed to capture RGBA image from camera\n");
-
-		// detect objects in the frame
-		detectNet::Detection* detections = NULL;
+		printf("%i objects detected\n", numDetections);
 	
-		const int numDetections = net->Detect(imgRGBA, camera->GetWidth(), camera->GetHeight(), &detections, overlayFlags);
-		
-		if( numDetections > 0 )
+		for( int n=0; n < numDetections; n++ )
 		{
-			printf("%i objects detected\n", numDetections);
-		
-			for( int n=0; n < numDetections; n++ )
-			{
-				printf("detected obj %i  class #%u (%s)  confidence=%f\n", n, detections[n].ClassID, net->GetClassDesc(detections[n].ClassID), detections[n].Confidence);
-				printf("bounding box %i  (%f, %f)  (%f, %f)  w=%f  h=%f\n", n, detections[n].Left, detections[n].Top, detections[n].Right, detections[n].Bottom, detections[n].Width(), detections[n].Height()); 
-			}
-		}	
-
-		// update display
-		if( display != NULL )
-		{
-			// render the image
-			display->RenderOnce(imgRGBA, camera->GetWidth(), camera->GetHeight());
-
-			// update the status bar
-			char str[256];
-			sprintf(str, "TensorRT %i.%i.%i | %s | Network %.0f FPS", NV_TENSORRT_MAJOR, NV_TENSORRT_MINOR, NV_TENSORRT_PATCH, precisionTypeToStr(net->GetPrecision()), net->GetNetworkFPS());
-			display->SetTitle(str);
-
-			// check if the user quit
-			if( display->IsClosed() )
-				SIGNAL_RECIEVED = true;
+			printf("detected obj %i  class #%u (%s)  confidence=%f\n", n, detections[n].ClassID, net->GetClassDesc(detections[n].ClassID), detections[n].Confidence);
+			printf("bounding box %i  (%f, %f)  (%f, %f)  w=%f  h=%f\n", n, detections[n].Left, detections[n].Top, detections[n].Right, detections[n].Bottom, detections[n].Width(), detections[n].Height()); 
 		}
-
-		// print out timing info
-		net->PrintProfilerTimes();
+	}	
+*/
+	// update display
+	if( display != NULL )
+	{
+		// render the image
+		display->RenderOnce(imgRGBA, 500, 480);
+/*
+		// update the status bar
+		char str[256];
+		sprintf(str, "TensorRT %i.%i.%i | %s | Network %.0f FPS", NV_TENSORRT_MAJOR, NV_TENSORRT_MINOR, NV_TENSORRT_PATCH, precisionTypeToStr(net->GetPrecision()), net->GetNetworkFPS());
+		display->SetTitle(str);
+*/
+		// check if the user quit
+		if( display->IsClosed() )
+			SIGNAL_RECIEVED = true;
 	}
-	
 
-	/*
-	 * destroy resources
-	 */
+	// print out timing info
+	net->PrintProfilerTimes();
 	
-	/*printf("detectnet-camera:  shutting down...\n");
-	
-	SAFE_DELETE(camera);
-	SAFE_DELETE(display);
-	SAFE_DELETE(net);
-
-	printf("detectnet-camera:  shutdown complete.\n");*/
-
 	return 0;
 }
 

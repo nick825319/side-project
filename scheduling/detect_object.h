@@ -26,7 +26,7 @@
 #include "gstCamera.h"
 #include "glDisplay.h"
 
-detectNet* load_detectNet(char* modelName = "ssd-mobilenet-v2");
+detectNet* load_detectNet(char* modelName , char* dataset_path);
 int detect(detectNet* net, gstCamera* camera, glDisplay* display);
 
 #endif

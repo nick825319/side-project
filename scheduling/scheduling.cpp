@@ -39,8 +39,8 @@
 #include <algorithm>
 #include <stdlib.h> 
 
-#define isOpenCam  0
-#define isLoadNet  0
+#define isOpenCam  1
+#define isLoadNet  1
 
 bool SIGNAL_RECIEVED = false;
 gstCamera* camera;
@@ -59,7 +59,7 @@ void signHandler(int dummy){
 	write_responseTime(0, s + s_datetime );
 
 	if(isOpenCam == 1){
-    	SAFE_DELETE(camera);
+    		SAFE_DELETE(camera);
 		SAFE_DELETE(display);
 	}
 	if(isLoadNet == 1)
@@ -73,10 +73,9 @@ glDisplay* create_display(){
 	return display;
 }
 gstCamera* initalize_camera(int d_width,int d_height,char* cameraIndex){
-	camera = gstCamera::Create(d_width, d_height, cameraIndex);
+	camera = gstCamera::Create(d_width, d_height, NULL);
 	return camera;
 }
-
 
 void write_responseTime(int delta, std::string taskname){
 	std::ofstream file;
@@ -107,11 +106,11 @@ int main( int argc, char** argv )
 	std::chrono::system_clock::time_point endTime;
 
 	if(isOpenCam == 1){
-		camera = initalize_camera();
+		camera = initalize_camera(500,480);
 		display = create_display();
 	}
 	if(isLoadNet == 1){
-		net = load_detectNet();
+		//net = load_detectNet("mb2-ssd-lite.onnx", "./voc-model-labels.txt");
 	}
 
 	//exist_new_model(ipAddress ,model_port);
@@ -123,7 +122,7 @@ int main( int argc, char** argv )
 		signal(SIGINT, signHandler);
 		if(STOPSING != 1)
 		{
-		/*
+		
 			startTime = std::chrono::system_clock::now();
 
 			int reslut = imageCapture(camera);
@@ -132,7 +131,7 @@ int main( int argc, char** argv )
 			delta = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
 			std::cout << "imageCapture() response time (milli) : " << delta << std::endl;
 			write_responseTime(delta ,std::string("imageCapture() response time"));
-			*/
+			
 
 			
 			//	task2-transfer_image
@@ -188,7 +187,7 @@ int main( int argc, char** argv )
 			//detect(net, camera, display);
 
 			// task6 - get piCam detection from composer
-			piMsgReceive(selfIpAddress,  piPort);	
+			//piMsgReceive(selfIpAddress,  piPort);	
 
 					
 		}
