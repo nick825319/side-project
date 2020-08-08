@@ -23,8 +23,8 @@
 #include "detectNet.h"
 #include "detect_object.h"
 
-#include "gstCamera.h"
-#include "glDisplay.h"
+#include "videoSource.h"
+#include "videoOutput.h" 
 
 #include "signal_handle.h"
 /*
@@ -49,7 +49,7 @@ detectNet* load_detectNet(char* modelName, char* dataset_path){
 		const char* out_cvg      = "scores";
 		const char* out_bbox     = "boxes";
 		
-		std::string tmp = std::string(dataset_path) + "labels.txt";
+		std::string tmp = std::string(dataset_path);
 		const char* class_labels   = const_cast<char*>(tmp.c_str());
 		
 		net = detectNet::Create(prototxt, modelName, meanPixel, class_labels, threshold, input, 
@@ -63,16 +63,18 @@ detectNet* load_detectNet(char* modelName, char* dataset_path){
 }
 
 
-int detect(detectNet* net, gstCamera* camera, glDisplay* display)
+int detect(detectNet* net, videoSource* input, videoOutput* output)
 {
 	/*
 	 * create the camera device
 	 */
-	if( !camera )
+	if( !input )
 	{
 		printf("\ndetectnet-camera:  failed to initialize camera device\n");
 		return 0;
 	}
+	if( !output )
+		LogError("detectnet:  failed to create output stream\n");
 
 	/**
 	 * Parse a string sequence into OverlayFlags enum.
@@ -82,28 +84,20 @@ int detect(detectNet* net, gstCamera* camera, glDisplay* display)
 	 */
 	char* OverlayFlag = "label";
 	const uint32_t overlayFlags = detectNet::OverlayFlagsFromStr(OverlayFlag);
-
-	if( !display ) 
-		printf("detectnet-camera:  failed to create openGL display\n");
-	if( !camera->Open() )
-	{
-		printf("detectnet-camera:  failed to open camera for streaming\n");
-		return 0;
-	}
 	
 	float confidence = 0.0f;
 	
 	
 	// capture RGBA image
-	float* imgRGBA = NULL;
+	uchar3* imgRGBA = NULL;
 	
-	if( !camera->CaptureRGBA(&imgRGBA) )
+	if( !input->Capture(&imgRGBA, 1000) )
 		printf("detectnet-camera:  failed to capture RGBA image from camera\n");
-/*
+
 	// detect objects in the frame
 	detectNet::Detection* detections = NULL;
 
-	const int numDetections = net->Detect(imgRGBA, camera->GetWidth(), camera->GetHeight(), &detections, overlayFlags);
+	const int numDetections = net->Detect(imgRGBA, input->GetWidth(), input->GetHeight(), &detections, overlayFlags);
 	
 	if( numDetections > 0 )
 	{
@@ -115,20 +109,20 @@ int detect(detectNet* net, gstCamera* camera, glDisplay* display)
 			printf("bounding box %i  (%f, %f)  (%f, %f)  w=%f  h=%f\n", n, detections[n].Left, detections[n].Top, detections[n].Right, detections[n].Bottom, detections[n].Width(), detections[n].Height()); 
 		}
 	}	
-*/
+
 	// update display
-	if( display != NULL )
+	if( output != NULL )
 	{
 		// render the image
-		display->RenderOnce(imgRGBA, 500, 480);
-/*
+		output->Render(imgRGBA, input->GetWidth(), input->GetHeight());
+
 		// update the status bar
 		char str[256];
 		sprintf(str, "TensorRT %i.%i.%i | %s | Network %.0f FPS", NV_TENSORRT_MAJOR, NV_TENSORRT_MINOR, NV_TENSORRT_PATCH, precisionTypeToStr(net->GetPrecision()), net->GetNetworkFPS());
-		display->SetTitle(str);
-*/
+		output->SetStatus(str);
+
 		// check if the user quit
-		if( display->IsClosed() )
+		if( !output->IsStreaming() )
 			SIGNAL_RECIEVED = true;
 	}
 

@@ -37,16 +37,40 @@
 #include <iostream>
 #include <chrono>
 #include <algorithm>
-#include <stdlib.h> 
+#include <stdlib.h>
+
+#include "videoSource.h"
+#include "videoOutput.h" 
+
+#ifdef HEADLESS
+	#define IS_HEADLESS() "headless"	// run without display
+#else
+	#define IS_HEADLESS() (const char*)NULL
+#endif
+
 
 #define isOpenCam  1
 #define isLoadNet  1
+#define isOutput_responseTime 0
+
+#define isimageCapture 0
+#define istransfer_image 0
+#define isrequest_model 0
+#define isdelete_image 0
+#define isclassify 0
+#define isdetect 1
+#define ispiMsgReceive 0
+
 
 bool SIGNAL_RECIEVED = false;
 gstCamera* camera;
 glDisplay* display;
+
+videoSource* input;
+videoOutput* output;
+
 detectNet* net;
-//imageNet* net
+imageNet* ImgNet;
 int STOPSING = 0;
 void signHandler(int dummy){
 	STOPSING = 1 ;
@@ -59,15 +83,18 @@ void signHandler(int dummy){
 	write_responseTime(0, s + s_datetime );
 
 	if(isOpenCam == 1){
-    		SAFE_DELETE(camera);
-		SAFE_DELETE(display);
+    	SAFE_DELETE(input);
+		SAFE_DELETE(output);
 	}
 	if(isLoadNet == 1)
 		SAFE_DELETE(net);
-	std::cout << "stop process , safe release memory" << std::endl;
+	std::cout << "stop process ,release memory" << std::endl;
 	exit(0);
 }
 
+/*
+    legacy code
+*/
 glDisplay* create_display(){
 	display = glDisplay::Create();
 	return display;
@@ -76,22 +103,6 @@ gstCamera* initalize_camera(int d_width,int d_height,char* cameraIndex){
 	camera = gstCamera::Create(d_width, d_height, NULL);
 	return camera;
 }
-
-void write_responseTime(int delta, std::string taskname){
-	std::ofstream file;
-	std::string filename = "task_responseTime.txt";
-	file.open(filename,std::ofstream::out | std::ofstream::binary | std::ofstream::app);
-
-    std::string writed_string;
-    writed_string.append(taskname);
-    writed_string.append(" : ");
-    writed_string.append(std::to_string(delta));
-	writed_string.append("\n");
-
-	file.write(writed_string.data(), writed_string.length());
-	file.close();
-}
-
 
 int main( int argc, char** argv )
 {
@@ -105,94 +116,104 @@ int main( int argc, char** argv )
 	std::chrono::system_clock::time_point startTime;
 	std::chrono::system_clock::time_point endTime;
 
-	if(isOpenCam == 1){
-		camera = initalize_camera(500,480);
-		display = create_display();
+	if(isOpenCam == 1){	
+		commandLine cmdLine(argc, argv, IS_HEADLESS());
+		input = videoSource::Create(cmdLine, ARG_POSITION(0));
+		if( !input )
+		{
+			LogError("scheduling:  failed to create input stream\n");
+			return 0;
+		}
+
+		output = videoOutput::Create(cmdLine, ARG_POSITION(1));
+
+		//camera = initalize_camera(500,480);
+		//display = create_display();
 	}
 	if(isLoadNet == 1){
-		//net = load_detectNet("mb2-ssd-lite.onnx", "./voc-model-labels.txt");
+		net = load_detectNet("mb1-ssd.onnx", "./voc-model-label.txt");
+		//net = load_detectNet("ssd-mobilenet.onnx", "./labels.txt");
+		//net = load_detectNet("ssd-mobilenet-v2", NULL);
 	}
 
 	//exist_new_model(ipAddress ,model_port);
-	for(int i=0 ; i<1; i++){
-		/*
-			task1-imageCapture
-			//TODO another trigger imageCapture way 
-		*/
+	//for(int i=0 ; i<1; i++)
+	while(true)
+	{
 		signal(SIGINT, signHandler);
 		if(STOPSING != 1)
 		{
-		
-			startTime = std::chrono::system_clock::now();
-
-			int reslut = imageCapture(camera);
-
-			endTime = std::chrono::system_clock::now();
-			delta = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
-			std::cout << "imageCapture() response time (milli) : " << delta << std::endl;
-			write_responseTime(delta ,std::string("imageCapture() response time"));
-			
-
-			
+			if(isimageCapture == 1){
+				startTime = std::chrono::system_clock::now();
+				int reslut = imageCapture(camera);
+				measure_endTime_peried(startTime, std::string("imageCapture"));
+			}
 			//	task2-transfer_image
-			/*
-			startTime = std::chrono::system_clock::now();
-
-			transfer_image("test",ipAddress ,port);
-
-			endTime = std::chrono::system_clock::now();
-			delta = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
-			std::cout << "transfer_image() response time (milli) : " << delta << std::endl;
-			write_responseTime(delta ,std::string("transfer_image() response time"));
-*/
-			
+			if(istransfer_image ==1){
+				startTime = std::chrono::system_clock::now();
+				transfer_image("test",ipAddress ,port);
+				measure_endTime_peried(startTime, std::string("transfer_image"));
+			}
 			//	task3-request_model
-			
-			startTime = std::chrono::system_clock::now();
-
-			//request_model(ipAddress, model_port, "mb2-ssd-lite.onnx");
-
-			endTime = std::chrono::system_clock::now();
-			delta = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
-			//std::cout << "request_model() response time (milli) : " << delta << std::endl;
-			//write_responseTime(delta ,std::string("request_model() response time"));
-
-			
+			if(isrequest_model==1){
+				startTime = std::chrono::system_clock::now();
+				request_model(ipAddress, model_port, "mb1-ssd.onnx");
+				measure_endTime_peried(startTime, std::string("request_model"));
+			}
 			//	task3-delete_image
-			/*
-			startTime = std::chrono::system_clock::now();
-
-			delete_image();
-
-			endTime = std::chrono::system_clock::now();
-			delta = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
-			std::cout << "delete_image() response time (milli) : " << delta << std::endl;
-			write_responseTime(delta ,std::string("delete_image() response time"));*/
-
-			
+				if(isdelete_image ==1){
+				startTime = std::chrono::system_clock::now();
+				delete_image();
+				measure_endTime_peried(startTime, std::string("delete_image"));
+			}
 			//	task4-classify
-			/*startTime = std::chrono::system_clock::now();
-			std::string filename = "Image-1588576875376.JPEG";
-			std::string inputfilename = "imageCapture/" + filename;
-			std::string outfilename = "classify_result/" + filename;
-			
-			classify(const_cast<char*>(inputfilename.c_str()), const_cast<char*>(outfilename.c_str()), net);
+			if(isclassify==1){
+			    /*
+				test case
+			    */
+				std::string filename = "Image-1588576875376.JPEG";
+				std::string inputfilename = "imageCapture/" + filename;
+				std::string outfilename = "classify_result/" + filename;
 
-			endTime = std::chrono::system_clock::now();
-			delta = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
-			std::cout << "classify() response time (milli) : " << delta << std::endl;
-			write_responseTime(delta ,std::string("classify() response time"));*/
-
-			//	task5-detect object
-			//detect(net, camera, display);
-
+				startTime = std::chrono::system_clock::now();
+				classify(const_cast<char*>(inputfilename.c_str()), const_cast<char*>(outfilename.c_str()), ImgNet);
+				measure_endTime_peried(startTime, std::string("classify"));
+			}
+			//task5-detect object
+			if(isdetect ==1){
+				detect(net, input, output);
+			}
 			// task6 - get piCam detection from composer
-			//piMsgReceive(selfIpAddress,  piPort);	
-
-					
+			if(ispiMsgReceive == 1){
+				piMsgReceive(selfIpAddress,  piPort);	
+			}				
 		}
 	}
 	std::cout << "exit delta :" << delta << std::endl;
 	return 0;
 }
 
+void write_responseTime(int delta, std::string outputStr){
+	std::ofstream file;
+	std::string filename = "task_responseTime.txt";
+	file.open(filename,std::ofstream::out | std::ofstream::binary | std::ofstream::app);
+
+    std::string writed_string;
+    writed_string.append(outputStr + " : " + std::to_string(delta) + "\n");
+
+	file.write(writed_string.data(), writed_string.length());
+	file.close();
+}
+
+void measure_endTime_peried(std::chrono::system_clock::time_point startTime, std::string taskname){
+	std::chrono::system_clock::time_point endTime;
+	int delta;
+	
+	endTime = std::chrono::system_clock::now();
+	delta = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
+	std::cout << taskname <<"() response time (milli) : " << delta << std::endl;
+
+	if(isOutput_responseTime == 1){
+		write_responseTime(delta, taskname + std::string("() response time"));
+	}
+}

@@ -23,11 +23,11 @@
 #define DETECT_OBJECT_H_
 
 #include "detectNet.h"
-#include "gstCamera.h"
-#include "glDisplay.h"
+#include "videoSource.h"
+#include "videoOutput.h" 
 
 detectNet* load_detectNet(char* modelName , char* dataset_path);
-int detect(detectNet* net, gstCamera* camera, glDisplay* display);
+int detect(detectNet* net, videoSource* input, videoOutput* output);
 
 #endif
 
