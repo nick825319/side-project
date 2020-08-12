@@ -2,15 +2,14 @@
 #include "transferor.h"
 #include "imageIO.h"
 #include <iostream>
-//#include "cudaMappedMemory.h"
 #include <fstream>
-#include <cstdlib>
-#include <memory>
-#include <string>
-
+//#include <cstdlib>
+//#include <memory>
+//#include <string>
 #include "socket_connect.h"
 #include "Socket.h"
 
+//#include "cudaMappedMemory.h"
 #include <openssl/md5.h>
 int transfer_image(const char* imgPath, char* ipAddress, uint16_t port){
 	/*

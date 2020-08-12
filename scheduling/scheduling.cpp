@@ -48,7 +48,6 @@
 	#define IS_HEADLESS() (const char*)NULL
 #endif
 
-
 #define isOpenCam  1
 #define isLoadNet  1
 #define isOutput_responseTime 0
@@ -103,6 +102,7 @@ gstCamera* initalize_camera(int d_width,int d_height,char* cameraIndex){
 	camera = gstCamera::Create(d_width, d_height, NULL);
 	return camera;
 }
+//
 
 int main( int argc, char** argv )
 {

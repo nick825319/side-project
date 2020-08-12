@@ -27,6 +27,8 @@
 #include "videoOutput.h" 
 
 #include "signal_handle.h"
+#include <chrono>
+#include <iostream>
 /*
 * default 
 * model_name = ssd-mobilenet-v2
@@ -97,8 +99,14 @@ int detect(detectNet* net, videoSource* input, videoOutput* output)
 	// detect objects in the frame
 	detectNet::Detection* detections = NULL;
 
+    std::chrono::system_clock::time_point startTime = std::chrono::system_clock::now();
+
 	const int numDetections = net->Detect(imgRGBA, input->GetWidth(), input->GetHeight(), &detections, overlayFlags);
-	
+
+	std::chrono::system_clock::time_point endTime = std::chrono::system_clock::now();
+	int delta = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
+	std::cout <<"inference time (milli) : " << delta << std::endl;
+
 	if( numDetections > 0 )
 	{
 		printf("%i objects detected\n", numDetections);
