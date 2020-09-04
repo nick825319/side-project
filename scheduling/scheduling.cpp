@@ -38,9 +38,12 @@
 #include <chrono>
 #include <algorithm>
 #include <stdlib.h>
-
+#include <pthread.h>
 #include "videoSource.h"
 #include "videoOutput.h" 
+#include "pwmCtl.h"
+
+#include <tuple>
 
 #ifdef HEADLESS
 	#define IS_HEADLESS() "headless"	// run without display
@@ -59,18 +62,25 @@
 #define isclassify 0
 #define isdetect 1
 #define ispiMsgReceive 0
-
-
+#define ismotorCtl 0
 bool SIGNAL_RECIEVED = false;
+
+// legacy code
 gstCamera* camera;
 glDisplay* display;
-
-videoSource* input;
-videoOutput* output;
-
-detectNet* net;
+//
 imageNet* ImgNet;
 int STOPSING = 0;
+
+Detect_resource* g_detect_resource;
+
+int g_detecting_person = 0;
+std::tuple<float, float> g_objection_center = {0.0, 0.0};
+float g_object_width = 0;
+
+pthread_mutex_t mute_pi_person = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mute_objection_center = PTHREAD_MUTEX_INITIALIZER;
+
 void signHandler(int dummy){
 	STOPSING = 1 ;
 
@@ -82,67 +92,82 @@ void signHandler(int dummy){
 	write_responseTime(0, s + s_datetime );
 
 	if(isOpenCam == 1){
-    	SAFE_DELETE(input);
-		SAFE_DELETE(output);
+    	SAFE_DELETE(g_detect_resource->input);
+		SAFE_DELETE(g_detect_resource->output);
 	}
 	if(isLoadNet == 1)
-		SAFE_DELETE(net);
-	std::cout << "stop process ,release memory" << std::endl;
+		SAFE_DELETE(g_detect_resource->net);
+    //unmap_all();
+	std::cout << "stop process, release memory" << std::endl;
 	exit(0);
 }
-
-/*
-    legacy code
-*/
-glDisplay* create_display(){
-	display = glDisplay::Create();
-	return display;
+void IP_repo_init(IP_repo* ip_repo){
+    ip_repo->ipAddress = "140.122.185.98";
+	ip_repo->PiIpAddress = "140.122.184.239";
+	ip_repo->selfIpAddress = "140.122.184.103";
+	ip_repo->port = 12000;
+	ip_repo->model_port = 12100;
+	ip_repo->listen_port = 15200;
+    ip_repo->listening_port = (bool *)malloc(sizeof(bool));
+    *(ip_repo->listening_port) = false;
 }
-gstCamera* initalize_camera(int d_width,int d_height,char* cameraIndex){
-	camera = gstCamera::Create(d_width, d_height, NULL);
-	return camera;
-}
-//
-
 int main( int argc, char** argv )
 {
-	char* ipAddress = "140.122.185.98";
-	char* PiIpAddress = "140.122.184.239";
-	char* selfIpAddress = "140.122.184.103";
-	uint16_t port = 12000;
-	uint16_t model_port = 12100;
-	uint16_t piPort = 15200;
+    IP_repo* ip_repo;
+    IP_repo_init(ip_repo);
+    
+
+    g_detect_resource = (Detect_resource *)malloc(sizeof(Detect_resource));
+
 	int delta;
 	std::chrono::system_clock::time_point startTime;
 	std::chrono::system_clock::time_point endTime;
 
 	if(isOpenCam == 1){	
 		commandLine cmdLine(argc, argv, IS_HEADLESS());
-		input = videoSource::Create(cmdLine, ARG_POSITION(0));
-		if( !input )
+		g_detect_resource->input = videoSource::Create(cmdLine, ARG_POSITION(0));
+        g_detect_resource->input->GetOptions().Print();
+		if( !g_detect_resource->input )
 		{
 			LogError("scheduling:  failed to create input stream\n");
 			return 0;
 		}
 
-		output = videoOutput::Create(cmdLine, ARG_POSITION(1));
-
-		//camera = initalize_camera(500,480);
-		//display = create_display();
+		g_detect_resource->output = videoOutput::Create(cmdLine, ARG_POSITION(1));
 	}
 	if(isLoadNet == 1){
-		net = load_detectNet("mb1-ssd.onnx", "./voc-model-label.txt");
+		g_detect_resource->net = load_detectNet("mb1-ssd.onnx", "./voc-model-label.txt");
 		//net = load_detectNet("ssd-mobilenet.onnx", "./labels.txt");
 		//net = load_detectNet("ssd-mobilenet-v2", NULL);
 	}
 
-	//exist_new_model(ipAddress ,model_port);
+    /*
+        Thread creat
+    */
+    pthread_t thr_detect;
+    pthread_t thr_piMsg;
+    pthread_t thr_motor;
+    //pthread_create(&thr_detect, NULL, detect, (void *)g_detect_resource);
+    
+
+
+    // task6 - get piCam detection from composer
+	if(ispiMsgReceive == 1){
+        pthread_create(&thr_piMsg, NULL, piMsgReceive, (void *)ip_repo);
+        //piMsgReceive(ip_repo);
+        //pthread_join(thr_piMsg, NULL);
+	}
+    // task7 - motor control
+    if(ismotorCtl == 1){
+        pthread_create(&thr_motor, NULL, pwmctl_forward, NULL);
+	}
 	//for(int i=0 ; i<1; i++)
 	while(true)
 	{
 		signal(SIGINT, signHandler);
 		if(STOPSING != 1)
 		{
+            //exist_new_model(ip_repo->ipAddress ,model_port);
 			if(isimageCapture == 1){
 				startTime = std::chrono::system_clock::now();
 				int reslut = imageCapture(camera);
@@ -151,13 +176,13 @@ int main( int argc, char** argv )
 			//	task2-transfer_image
 			if(istransfer_image ==1){
 				startTime = std::chrono::system_clock::now();
-				transfer_image("test",ipAddress ,port);
+				transfer_image("test",ip_repo->ipAddress ,ip_repo->port);
 				measure_endTime_peried(startTime, std::string("transfer_image"));
 			}
 			//	task3-request_model
 			if(isrequest_model==1){
 				startTime = std::chrono::system_clock::now();
-				request_model(ipAddress, model_port, "mb1-ssd.onnx");
+				request_model(ip_repo->ipAddress, ip_repo->model_port, "mb1-ssd.onnx");
 				measure_endTime_peried(startTime, std::string("request_model"));
 			}
 			//	task3-delete_image
@@ -181,15 +206,19 @@ int main( int argc, char** argv )
 			}
 			//task5-detect object
 			if(isdetect ==1){
-				detect(net, input, output);
+                //int a = pthread_create(&thr_detect, NULL, detect, (void *)g_detect_resource);
+                //std::cout << "pthread return : " << a  << std::endl;
+                //perror("Error: ");
+                //pthread_join(thr_detect, NULL);
+				detect(g_detect_resource);
+                std::cout << "object center: X:" << std::get<0>(g_objection_center);
+                std::cout << " y:" << std::get<1>(g_objection_center) << std::endl;
 			}
-			// task6 - get piCam detection from composer
-			if(ispiMsgReceive == 1){
-				piMsgReceive(selfIpAddress,  piPort);	
-			}				
+            			
 		}
 	}
 	std::cout << "exit delta :" << delta << std::endl;
+    free(ip_repo->listening_port);
 	return 0;
 }
 

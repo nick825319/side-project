@@ -26,8 +26,14 @@
 #include "videoSource.h"
 #include "videoOutput.h" 
 
+typedef struct{
+    videoSource* input;
+    videoOutput* output;
+    detectNet* net;
+}Detect_resource;
+
 detectNet* load_detectNet(char* modelName , char* dataset_path);
-int detect(detectNet* net, videoSource* input, videoOutput* output);
+void* detect(void* detect_resource);
 
 #endif
 

@@ -22,6 +22,7 @@
 
 #include "detectNet.h"
 #include "detect_object.h"
+#include "scheduling.h"
 
 #include "videoSource.h"
 #include "videoOutput.h" 
@@ -29,11 +30,19 @@
 #include "signal_handle.h"
 #include <chrono>
 #include <iostream>
+#include <unistd.h>
+
+#include <tuple>
+#include <pthread.h>
 /*
 * default 
 * model_name = ssd-mobilenet-v2
 * threshold
 */
+extern std::tuple<float, float> g_objection_center;
+extern pthread_mutex_t mute_objection_center;
+extern float g_object_width;
+
 detectNet* load_detectNet(char* modelName, char* dataset_path){
 	/*
 	 * create detect object network
@@ -65,26 +74,26 @@ detectNet* load_detectNet(char* modelName, char* dataset_path){
 }
 
 
-int detect(detectNet* net, videoSource* input, videoOutput* output)
+void* detect(void* detect_resource)
 {
 	/*
 	 * create the camera device
 	 */
-	if( !input )
+	if( !((Detect_resource *)detect_resource)->input )
 	{
 		printf("\ndetectnet-camera:  failed to initialize camera device\n");
-		return 0;
+		return NULL;
 	}
-	if( !output )
+	if( !((Detect_resource *)detect_resource)->output )
 		LogError("detectnet:  failed to create output stream\n");
-
+    
 	/**
 	 * Parse a string sequence into OverlayFlags enum.
 	 * Valid flags are "none", "box", "label", and "conf" and it is possible to combine flags
 	 * (bitwise OR) together with commas or pipe (|) symbol.  For example, the string sequence
 	 * "box,label,conf" would return the flags `OVERLAY_BOX|OVERLAY_LABEL|OVERLAY_CONFIDENCE`.
 	 */
-	char* OverlayFlag = "label";
+	char* OverlayFlag = "box,labels,conf";
 	const uint32_t overlayFlags = detectNet::OverlayFlagsFromStr(OverlayFlag);
 	
 	float confidence = 0.0f;
@@ -93,50 +102,61 @@ int detect(detectNet* net, videoSource* input, videoOutput* output)
 	// capture RGBA image
 	uchar3* imgRGBA = NULL;
 	
-	if( !input->Capture(&imgRGBA, 1000) )
+	if( !((Detect_resource *)detect_resource)->input->Capture(&imgRGBA, 1000) )
 		printf("detectnet-camera:  failed to capture RGBA image from camera\n");
+    
+
 
 	// detect objects in the frame
 	detectNet::Detection* detections = NULL;
 
     std::chrono::system_clock::time_point startTime = std::chrono::system_clock::now();
 
-	const int numDetections = net->Detect(imgRGBA, input->GetWidth(), input->GetHeight(), &detections, overlayFlags);
+	const int numDetections = ((Detect_resource *)detect_resource)->net->Detect(imgRGBA, ((Detect_resource *)detect_resource)->input->GetWidth(), ((Detect_resource *)detect_resource)->input->GetHeight(), &detections, overlayFlags);
 
 	std::chrono::system_clock::time_point endTime = std::chrono::system_clock::now();
 	int delta = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
 	std::cout <<"inference time (milli) : " << delta << std::endl;
-
+    
+    std::get<0>(g_objection_center) = 0;
+    std::get<1>(g_objection_center) = 0;
 	if( numDetections > 0 )
 	{
 		printf("%i objects detected\n", numDetections);
 	
 		for( int n=0; n < numDetections; n++ )
 		{
-			printf("detected obj %i  class #%u (%s)  confidence=%f\n", n, detections[n].ClassID, net->GetClassDesc(detections[n].ClassID), detections[n].Confidence);
+			printf("detected obj %i  class #%u (%s)  confidence=%f\n", n, detections[n].ClassID, ((Detect_resource *)detect_resource)->net->GetClassDesc(detections[n].ClassID), detections[n].Confidence);
 			printf("bounding box %i  (%f, %f)  (%f, %f)  w=%f  h=%f\n", n, detections[n].Left, detections[n].Top, detections[n].Right, detections[n].Bottom, detections[n].Width(), detections[n].Height()); 
+            
+            pthread_mutex_lock(&mute_objection_center);
+            g_object_width = detections[n].Right - detections[n].Left;
+            std::get<0>(g_objection_center) = (detections[n].Right - detections[n].Left)/2;
+            std::get<1>(g_objection_center) = (detections[n].Bottom - detections[n].Top)/2;
+            pthread_mutex_unlock(&mute_objection_center);
+            
 		}
 	}	
 
 	// update display
-	if( output != NULL )
+	if( ((Detect_resource *)detect_resource)->output != NULL )
 	{
 		// render the image
-		output->Render(imgRGBA, input->GetWidth(), input->GetHeight());
+		((Detect_resource *)detect_resource)->output->Render(imgRGBA, ((Detect_resource *)detect_resource)->input->GetWidth(), ((Detect_resource *)detect_resource)->input->GetHeight());
 
 		// update the status bar
 		char str[256];
-		sprintf(str, "TensorRT %i.%i.%i | %s | Network %.0f FPS", NV_TENSORRT_MAJOR, NV_TENSORRT_MINOR, NV_TENSORRT_PATCH, precisionTypeToStr(net->GetPrecision()), net->GetNetworkFPS());
-		output->SetStatus(str);
+		sprintf(str, "TensorRT %i.%i.%i | %s | Network %.0f FPS", NV_TENSORRT_MAJOR, NV_TENSORRT_MINOR, NV_TENSORRT_PATCH, precisionTypeToStr(((Detect_resource *)detect_resource)->net->GetPrecision()), ((Detect_resource *)detect_resource)->net->GetNetworkFPS());
+		((Detect_resource *)detect_resource)->output->SetStatus(str);
 
 		// check if the user quit
-		if( !output->IsStreaming() )
+		if( !((Detect_resource *)detect_resource)->output->IsStreaming() )
 			SIGNAL_RECIEVED = true;
 	}
 
 	// print out timing info
-	net->PrintProfilerTimes();
-	
-	return 0;
+	((Detect_resource *)detect_resource)->net->PrintProfilerTimes();
+	usleep(100);
+	return NULL;
 }
 
