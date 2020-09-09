@@ -51,8 +51,8 @@
 	#define IS_HEADLESS() (const char*)NULL
 #endif
 
-#define isOpenCam  1
-#define isLoadNet  1
+#define isOpenCam  0
+#define isLoadNet  0
 #define isOutput_responseTime 0
 
 #define isimageCapture 0
@@ -60,8 +60,8 @@
 #define isrequest_model 0
 #define isdelete_image 0
 #define isclassify 0
-#define isdetect 1
-#define ispiMsgReceive 0
+#define isdetect 0
+#define ispiMsgReceive 1
 #define ismotorCtl 0
 bool SIGNAL_RECIEVED = false;
 
@@ -77,6 +77,7 @@ Detect_resource* g_detect_resource;
 int g_detecting_person = 0;
 std::tuple<float, float> g_objection_center = {0.0, 0.0};
 float g_object_width = 0;
+float g_object_high = 0;
 
 pthread_mutex_t mute_pi_person = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mute_objection_center = PTHREAD_MUTEX_INITIALIZER;
@@ -97,7 +98,7 @@ void signHandler(int dummy){
 	}
 	if(isLoadNet == 1)
 		SAFE_DELETE(g_detect_resource->net);
-    //unmap_all();
+    unmap_all();
 	std::cout << "stop process, release memory" << std::endl;
 	exit(0);
 }
@@ -105,6 +106,7 @@ void IP_repo_init(IP_repo* ip_repo){
     ip_repo->ipAddress = "140.122.185.98";
 	ip_repo->PiIpAddress = "140.122.184.239";
 	ip_repo->selfIpAddress = "140.122.184.103";
+     // ip_repo->selfIpAddress = "192.168.1.100";
 	ip_repo->port = 12000;
 	ip_repo->model_port = 12100;
 	ip_repo->listen_port = 15200;
@@ -159,7 +161,8 @@ int main( int argc, char** argv )
 	}
     // task7 - motor control
     if(ismotorCtl == 1){
-        pthread_create(&thr_motor, NULL, pwmctl_forward, NULL);
+        //pthread_create(&thr_motor, NULL, pwmctl_forward, NULL);
+        pthread_create(&thr_motor, NULL, presonFollow, NULL);
 	}
 	//for(int i=0 ; i<1; i++)
 	while(true)
@@ -224,7 +227,7 @@ int main( int argc, char** argv )
 
 void write_responseTime(int delta, std::string outputStr){
 	std::ofstream file;
-	std::string filename = "task_responseTime.txt";
+	std::string filename = "measure_task_responseTime.txt";
 	file.open(filename,std::ofstream::out | std::ofstream::binary | std::ofstream::app);
 
     std::string writed_string;

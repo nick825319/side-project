@@ -29,7 +29,8 @@ SOFTWARE.
 typedef enum direction {
     left = 1,
     right = 2,
-    center = 0
+    center = 0,
+    none = -1
 }Direction;
 
 void setmap_all();
@@ -43,10 +44,10 @@ void set_GPIO(const char* BCM_num);
 void set_GPIO_value_high(const char* BCM_num);
 void set_GPIO_value_low(const char* BCM_num);
 void unmap_GPIO(const char* BCM_num);
-
+bool is_closePerson();
 float max_check(float value);
 float min_check(float value);
-float envirCam_checkPerson(int change_1, int change_2);
+float envirCam_checkPerson(int* change_1, int* change_2);
 
 void* pwmctl_forward(void* );
 int pwmctl_byChar();

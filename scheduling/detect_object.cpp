@@ -42,6 +42,7 @@
 extern std::tuple<float, float> g_objection_center;
 extern pthread_mutex_t mute_objection_center;
 extern float g_object_width;
+extern float g_object_high;
 
 detectNet* load_detectNet(char* modelName, char* dataset_path){
 	/*
@@ -101,7 +102,7 @@ void* detect(void* detect_resource)
 	
 	// capture RGBA image
 	uchar3* imgRGBA = NULL;
-	
+	std::chrono::system_clock::time_point startTime = std::chrono::system_clock::now();
 	if( !((Detect_resource *)detect_resource)->input->Capture(&imgRGBA, 1000) )
 		printf("detectnet-camera:  failed to capture RGBA image from camera\n");
     
@@ -110,16 +111,23 @@ void* detect(void* detect_resource)
 	// detect objects in the frame
 	detectNet::Detection* detections = NULL;
 
-    std::chrono::system_clock::time_point startTime = std::chrono::system_clock::now();
+    std::chrono::system_clock::time_point inference_startTime = std::chrono::system_clock::now();
 
 	const int numDetections = ((Detect_resource *)detect_resource)->net->Detect(imgRGBA, ((Detect_resource *)detect_resource)->input->GetWidth(), ((Detect_resource *)detect_resource)->input->GetHeight(), &detections, overlayFlags);
 
 	std::chrono::system_clock::time_point endTime = std::chrono::system_clock::now();
-	int delta = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
+	int delta = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - inference_startTime).count();
+    int responsed_delta = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
 	std::cout <<"inference time (milli) : " << delta << std::endl;
-    
+    std::cout <<"detect object responsed_time (milli) : " << delta << std::endl;
+
+    pthread_mutex_lock(&mute_objection_center);
     std::get<0>(g_objection_center) = 0;
     std::get<1>(g_objection_center) = 0;
+    g_object_width = 0;
+    g_object_high = 0;
+    pthread_mutex_unlock(&mute_objection_center);
+
 	if( numDetections > 0 )
 	{
 		printf("%i objects detected\n", numDetections);
@@ -128,12 +136,15 @@ void* detect(void* detect_resource)
 		{
 			printf("detected obj %i  class #%u (%s)  confidence=%f\n", n, detections[n].ClassID, ((Detect_resource *)detect_resource)->net->GetClassDesc(detections[n].ClassID), detections[n].Confidence);
 			printf("bounding box %i  (%f, %f)  (%f, %f)  w=%f  h=%f\n", n, detections[n].Left, detections[n].Top, detections[n].Right, detections[n].Bottom, detections[n].Width(), detections[n].Height()); 
-            
-            pthread_mutex_lock(&mute_objection_center);
-            g_object_width = detections[n].Right - detections[n].Left;
-            std::get<0>(g_objection_center) = (detections[n].Right - detections[n].Left)/2;
-            std::get<1>(g_objection_center) = (detections[n].Bottom - detections[n].Top)/2;
-            pthread_mutex_unlock(&mute_objection_center);
+
+            if(detections[n].ClassID == 15){
+                pthread_mutex_lock(&mute_objection_center);
+                g_object_width = detections[n].Right - detections[n].Left;
+                g_object_high = detections[n].Bottom - detections[n].Top;
+                std::get<0>(g_objection_center) = (detections[n].Right - detections[n].Left)/2 + detections[n].Left;
+                std::get<1>(g_objection_center) = (detections[n].Bottom - detections[n].Top)/2 + detections[n].Top;
+                pthread_mutex_unlock(&mute_objection_center);
+            }
             
 		}
 	}	
