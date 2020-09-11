@@ -75,8 +75,8 @@ void* piMsgReceive(void* ip_repo){
             std::chrono::system_clock::time_point timeNow = std::chrono::system_clock::now();
 		    std::chrono::microseconds ms = std::chrono::duration_cast<std::chrono::microseconds>(timeNow.time_since_epoch());
             double j_time = (double)ms.count()/(double)1000000;
-            printf("composer_sending_time: %.8f \n", composer_sending_time);
-            printf("j_time: %.8f \n", j_time);
+           // printf("composer_sending_time: %.8f \n", composer_sending_time);
+           // printf("j_time: %.8f \n", j_time);
             // !!!note: label_transfer_time include network transfer and c++ inline code process time
             double label_transfer_time = j_time-composer_sending_time;
             
@@ -85,34 +85,30 @@ void* piMsgReceive(void* ip_repo){
             printf("J time: %.6f \n", j_time);
             */
             double FP_respondTime = pi_composer_respond_time + label_transfer_time;
-            printf("full path respond time: %.6f \n", FP_respondTime);
-            printf("label transfer time: %.6f \n", label_transfer_time);
+           // printf("full path respond time: %.6f \n", FP_respondTime);
+            //printf("label transfer time: %.6f \n", label_transfer_time);
             
             piMsgReceive_writeRespondTime(std::to_string(FP_respondTime));
             piMsgReceive_writeTransferLabelTime(std::to_string(label_transfer_time));
            // !!!note: cus socket send from composer label and time stick together, not socket->Recieve again
 
-           // memset(buff, 0, sizeof(buff));
-           // receivesize = socket->Recieve(buff, receive_buffersize, NULL, NULL);
+            //memset(buff, 0, sizeof(buff));
+            //receivesize = socket->Recieve(buff, receive_buffersize, NULL, NULL);
 
 		   // !!!note: conut pointer address buff pointer + size
 
-            std::string receviceLabel(buff, buff+receivesize);
-
-            
-           // std::cout << "receviceLabel: " << receviceLabel << "\n";
-
-               std::size_t found = receviceLabel.find("person", 0);
-               //critical section
-               pthread_mutex_lock(&mute_pi_person);   
-               if(found == 0){
-                   std::cout << "label : " << receviceLabel << std::endl;
-                   g_detecting_person = 1 ;
-               }else{
-                   g_detecting_person = 0 ;
-               }
-               pthread_mutex_unlock(&mute_pi_person);
-               //
+            std::string receviceLabel(buff+16, buff+receivesize);
+            std::size_t found = receviceLabel.find("person", 0);
+            //critical section
+            pthread_mutex_lock(&mute_pi_person);   
+            if(found != std::string::npos){
+                //std::cout << "label : " << receviceLabel << std::endl;
+                g_detecting_person = 1 ;
+            }else{
+                g_detecting_person = 0 ;
+            }
+            pthread_mutex_unlock(&mute_pi_person);
+            //
 
             if(receviceLabel.find("BYE") != std::string::npos)
 		    {

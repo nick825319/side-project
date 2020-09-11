@@ -51,8 +51,8 @@
 	#define IS_HEADLESS() (const char*)NULL
 #endif
 
-#define isOpenCam  0
-#define isLoadNet  0
+#define isOpenCam  1
+#define isLoadNet  1
 #define isOutput_responseTime 0
 
 #define isimageCapture 0
@@ -60,9 +60,9 @@
 #define isrequest_model 0
 #define isdelete_image 0
 #define isclassify 0
-#define isdetect 0
+#define isdetect 1
 #define ispiMsgReceive 1
-#define ismotorCtl 0
+#define ismotorCtl 1
 bool SIGNAL_RECIEVED = false;
 
 // legacy code

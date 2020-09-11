@@ -81,16 +81,16 @@ void* presonFollow(void* ){
             if(enum_dir == center){
                  set_forward_GPIO_valt();
                  speed_ratio = 1;
-                 printf("forwarding ! 1.0\n");
+                // printf("forwarding ! 1.0\n");
             }
             else if(enum_dir == right){
                  set_right_GPIO_valt();
                  speed_ratio = 0.9;
-                 printf("right ! 0.9\n");
+                // printf("right ! 0.9\n");
             }else if(enum_dir == left){
                  set_lift_GPIO_valt();
                  speed_ratio = 0.9;
-                 printf("left ! 0.9\n");
+               //  printf("left ! 0.9\n");
             }else if(enum_dir == none){
                 speed_ratio = 0;
             }
@@ -113,11 +113,11 @@ void* presonFollow(void* ){
                 break;
             }
             decelerate = envirCam_checkPerson(&change_1, &change_2);
-
+          //  printf("decelerate ! %f \n" , decelerate);
             if(speed_ratio >= 0){ 
                 speed_ratio = max_check(speed_ratio);
                 cur_speed = speed_ratio - decelerate;
-
+             //   printf("cur_speed ! %f \n" , cur_speed);
                 pca9685->setPWM(0, 0, (float)duty_cycle*cur_speed);
                 pca9685->setPWM(1, 0, (float)duty_cycle*cur_speed);
             }else{
@@ -138,7 +138,7 @@ bool is_closePerson(){
     pthread_mutex_lock(&mute_objection_center);
     if(g_object_width > direct_pix_boundary){
         isClose = true;
-        printf("close person, speed = 0\n");
+        //printf("close person, speed = 0\n");
     }
     pthread_mutex_unlock(&mute_objection_center);
 
@@ -157,8 +157,8 @@ Direction trackObject_direction(){
     if(g_objection_center != zoreTuple ){
         x_centralPoint = std::get<0>(g_objection_center);
         y_centralPoint = std::get<1>(g_objection_center);
-        printf("x_centralPoint: %02f\n",x_centralPoint) ;
-        printf("y_centralPoint: %02f\n",y_centralPoint) ;
+       // printf("x_centralPoint: %02f\n",x_centralPoint) ;
+      //  printf("y_centralPoint: %02f\n",y_centralPoint) ;
     }
     pthread_mutex_unlock(&mute_objection_center);
     if(g_object_width != 0 ){
@@ -178,7 +178,7 @@ float envirCam_checkPerson(int* change_1, int* change_2){
     float decelerate = 0;
     pthread_mutex_lock(&mute_pi_person);
     if(g_detecting_person == 1){
-        decelerate = 0.3;
+        decelerate = 0.6;
         
         if(*change_2 == 1){
             printf("g_detecting_person: %d\n",g_detecting_person) ;
