@@ -51,7 +51,8 @@
 	#define IS_HEADLESS() (const char*)NULL
 #endif
 
-#define isOpenCam  0
+#define isOpenCam  1
+#define isOpenDisplay 1
 #define isLoadNet  0
 #define isOutput_responseTime 0
 
@@ -63,7 +64,11 @@
 #define isdetect 0
 #define ispiMsgReceive 1
 #define ismotorCtl 0
+#define isimgStream_serv 1
+
+#define useWifi 0
 bool SIGNAL_RECIEVED = false;
+
 
 // legacy code
 gstCamera* camera;
@@ -73,43 +78,53 @@ imageNet* ImgNet;
 int STOPSING = 0;
 
 Detect_resource* g_detect_resource;
-
+Video_IP_resouce* g_video_IP_resouce;
 int g_detecting_person = 0;
 std::tuple<float, float> g_objection_center = {0.0, 0.0};
 float g_object_width = 0;
 float g_object_high = 0;
-
+bool g_server_connected = false;
+bool g_useWifi = false;
 pthread_mutex_t mute_pi_person = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mute_objection_center = PTHREAD_MUTEX_INITIALIZER;
 
+
 void signHandler(int dummy){
 	STOPSING = 1 ;
-
-	std::time_t t = std::time(0);   // get time now
+	/*std::time_t t = std::time(0);   // get time now
 	std::string s_datetime = std::asctime(std::localtime(&t));
 	s_datetime.erase(std::remove(s_datetime.end()-1, s_datetime.end(), '\n'),
                s_datetime.end());
 	std::string s = "----stop----";	
-	write_responseTime(0, s + s_datetime );
+	write_responseTime(0, s + s_datetime );*/
+}
+void release_source(){
 
-	if(isOpenCam == 1){
+    if(isOpenCam == 1){
+        std::cout << "release detect_resource->input" << std::endl;
     	SAFE_DELETE(g_detect_resource->input);
-		SAFE_DELETE(g_detect_resource->output);
 	}
-	if(isLoadNet == 1)
+    if(isOpenDisplay == 1){
+        std::cout << "release detect_resource->output" << std::endl;
+        SAFE_DELETE(g_detect_resource->output);
+    }
+	if(isLoadNet == 1){
+        std::cout << "release detect_resource->net" << std::endl;
 		SAFE_DELETE(g_detect_resource->net);
-    unmap_all();
+    }
+    if(ismotorCtl == 1){
+        unmap_all();}
 	std::cout << "stop process, release memory" << std::endl;
-	exit(0);
 }
 void IP_repo_init(IP_repo* ip_repo){
     ip_repo->ipAddress = "140.122.185.98";
 	ip_repo->PiIpAddress = "140.122.184.239";
 	ip_repo->selfIpAddress = "140.122.184.103";
-     // ip_repo->selfIpAddress = "192.168.1.100";
+    ip_repo->self_WIFI_IpAddress = "192.168.1.100";
 	ip_repo->port = 12000;
 	ip_repo->model_port = 12100;
 	ip_repo->listen_port = 15200;
+    ip_repo->listen_jpg_stream_port = 15000;
     ip_repo->listening_port = (bool *)malloc(sizeof(bool));
     *(ip_repo->listening_port) = false;
 }
@@ -117,8 +132,8 @@ int main( int argc, char** argv )
 {
     IP_repo* ip_repo;
     IP_repo_init(ip_repo);
-    
 
+    g_video_IP_resouce = (Video_IP_resouce *)malloc(sizeof(Video_IP_resouce));
     g_detect_resource = (Detect_resource *)malloc(sizeof(Detect_resource));
 
 	int delta;
@@ -134,7 +149,9 @@ int main( int argc, char** argv )
 			LogError("scheduling:  failed to create input stream\n");
 			return 0;
 		}
-
+	}
+    if(isOpenDisplay == 1){	
+		commandLine cmdLine(argc, argv, IS_HEADLESS());
 		g_detect_resource->output = videoOutput::Create(cmdLine, ARG_POSITION(1));
 	}
 	if(isLoadNet == 1){
@@ -142,7 +159,15 @@ int main( int argc, char** argv )
 		//net = load_detectNet("ssd-mobilenet.onnx", "./labels.txt");
 		//net = load_detectNet("ssd-mobilenet-v2", NULL);
 	}
-
+    if(isimgStream_serv == 1){
+        g_video_IP_resouce->ipAddress = ip_repo->ipAddress;
+        g_video_IP_resouce->listen_jpg_stream_port = ip_repo->listen_jpg_stream_port;
+        g_video_IP_resouce->input = g_detect_resource->input;
+        g_video_IP_resouce->output = g_detect_resource->output;
+    }
+    if(useWifi == 1){
+        g_useWifi = true;
+    }
     /*
         Thread creat
     */
@@ -152,7 +177,7 @@ int main( int argc, char** argv )
     //pthread_create(&thr_detect, NULL, detect, (void *)g_detect_resource);
     
 
-
+    
     // task6 - get piCam detection from composer
 	if(ispiMsgReceive == 1){
         pthread_create(&thr_piMsg, NULL, piMsgReceive, (void *)ip_repo);
@@ -162,14 +187,21 @@ int main( int argc, char** argv )
     // task7 - motor control
     if(ismotorCtl == 1){
         //pthread_create(&thr_motor, NULL, pwmctl_forward, NULL);
-        pthread_create(&thr_motor, NULL, presonFollow, NULL);
+        //pthread_create(&thr_motor, NULL, presonFollow, NULL);
+        pthread_create(&thr_motor, NULL, reverseRoute_stop, NULL);
+
 	}
-	//for(int i=0 ; i<1; i++)
-	while(true)
+   if(isimgStream_serv == 1){
+         //task8 - imgStream to composer
+         trans_imgStream(g_video_IP_resouce);
+    }       
+    //for(int i=0 ; i<1; i++)
+	while( !SIGNAL_RECIEVED )
 	{
 		signal(SIGINT, signHandler);
 		if(STOPSING != 1)
 		{
+
             //exist_new_model(ip_repo->ipAddress ,model_port);
 			if(isimageCapture == 1){
 				startTime = std::chrono::system_clock::now();
@@ -196,9 +228,7 @@ int main( int argc, char** argv )
 			}
 			//	task4-classify
 			if(isclassify==1){
-			    /*
-				test case
-			    */
+                // only test case
 				std::string filename = "Image-1588576875376.JPEG";
 				std::string inputfilename = "imageCapture/" + filename;
 				std::string outfilename = "classify_result/" + filename;
@@ -208,20 +238,23 @@ int main( int argc, char** argv )
 				measure_endTime_peried(startTime, std::string("classify"));
 			}
 			//task5-detect object
-			if(isdetect ==1){
+			if(isdetect == 1 ){
                 //int a = pthread_create(&thr_detect, NULL, detect, (void *)g_detect_resource);
                 //std::cout << "pthread return : " << a  << std::endl;
                 //perror("Error: ");
                 //pthread_join(thr_detect, NULL);
 				detect(g_detect_resource);
-                std::cout << "object center: X:" << std::get<0>(g_objection_center);
-                std::cout << " y:" << std::get<1>(g_objection_center) << std::endl;
-			}
-            			
+                //std::cout << "object center: X:" << std::get<0>(g_objection_center);
+                //std::cout << " y:" << std::get<1>(g_objection_center) << std::endl;
+			}			
 		}
+        else{
+            break;
+        }
 	}
-	std::cout << "exit delta :" << delta << std::endl;
+	std::cout << "exit - delta :" << delta << std::endl;
     free(ip_repo->listening_port);
+    release_source();
 	return 0;
 }
 

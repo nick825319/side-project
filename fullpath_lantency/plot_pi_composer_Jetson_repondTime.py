@@ -19,15 +19,17 @@ ax = fig.add_subplot()
 
 
 ax.set_xlabel('excution')
-ax.set_ylabel('respondTime(sec)')
+ax.set_ylabel('respondTime(milli_sec)')
 ax.set_title('FullPath_respondTime')
 
-plt.yticks(np.arange(0,max(fdata)+0.02, 0.03))
-
-
-plt.xticks(np.arange(0, 690+30, 30), rotation=60)
+fdata = fdata*1000
+average = sum(fdata) / len(fdata)
+plt.yticks(np.arange(0,max(fdata)+average*0.1, 30))
+plt.xticks(np.arange(0, len(fdata)+len(fdata)*0.01, len(fdata)/20), rotation=60)
 ax.plot(fdata, linestyle='-')
-ax.set_ylim(ymin=0,ymax=max(fdata)+0.02)
+ax.set_ylim(ymin=0,ymax=max(fdata)+average*0.1)
+
+
 plt.savefig('./measure_pi_composer_Jetson_repondTime.pdf')
 plt.show()
 

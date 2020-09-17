@@ -1,16 +1,172 @@
 #include "signal_handle.h"
 #include "transferor.h"
 #include "imageIO.h"
+#include "imageFormat.h"
 #include <iostream>
 #include <fstream>
-//#include <cstdlib>
-//#include <memory>
-//#include <string>
 #include "socket_connect.h"
 #include "Socket.h"
+#include <unistd.h>
+#include "detect_object.h"
 
-//#include "cudaMappedMemory.h"
+#include "cudaNormalize.h"
+
+//opencv
+#include <opencv2/opencv.hpp>
+#include <opencv2/core.hpp>
+#include <opencv2/imgcodecs.hpp>
+
 #include <openssl/md5.h>
+extern bool SIGNAL_RECIEVED;
+extern bool g_server_connected;
+void transferor_writeCameraIntervalTime(std::string content){
+    std::ofstream file;
+    file.open("measure_CameraInterval.txt",std::ofstream::out | std::ofstream::binary | std::ofstream::app);
+    
+    std::string writed_string;
+    writed_string.append(content + "\n");
+
+	file.write(writed_string.data(), writed_string.length());
+    file.close();
+}
+void transferor_writeCV_JPGTime(std::string content){
+    std::ofstream file;
+    file.open("measure_CV_JPG.txt",std::ofstream::out | std::ofstream::binary | std::ofstream::app);
+    
+    std::string writed_string;
+    writed_string.append(content + "\n");
+
+	file.write(writed_string.data(), writed_string.length());
+    file.close();
+}
+double  transferor_get_time_sec(){
+    std::chrono::system_clock::time_point timeNow = std::chrono::system_clock::now();
+    std::chrono::microseconds ms = std::chrono::duration_cast<std::chrono::microseconds>(timeNow.time_since_epoch());
+    return (double)ms.count()/(double)1000000;
+     
+}  
+void trans_imgStream(void* video_IP_resouce){
+    const int width = 1280;
+    const int height = 720;
+    const int channels = 3;
+    const int quality = 90;
+    double time_start_cam;
+    double time_end_cam;
+    double time_cam_interval;
+    uint32_t uint32_ip = static_cast<uint32_t>(std::stoul(((Video_IP_resouce*)video_IP_resouce)->ipAddress));
+    uint16_t port = ((Video_IP_resouce*)video_IP_resouce)->listen_jpg_stream_port;
+
+    bool connected = false;
+    //initial socket
+    SocketType TCP_type =  SOCKET_TCP;	
+	Socket* socket = socket->Create(SOCKET_TCP);
+	std::cout<<"socket Created..."<< std::endl;
+
+    while(!connected){
+        if(g_server_connected != true){
+            continue;
+        }
+        std::cout<<"socket trying to connect... 98 -p 15000"<< std::endl;
+	    connected = socket->Connect(((Video_IP_resouce*)video_IP_resouce)->ipAddress, 
+                            ((Video_IP_resouce*)video_IP_resouce)->listen_jpg_stream_port); 
+
+        while( !SIGNAL_RECIEVED )
+	    {
+            if(!SIGNAL_RECIEVED){
+                if( !((Video_IP_resouce *)video_IP_resouce)->input )
+	            {
+		            printf("\ndetectnet-camera:  failed to initialize camera device\n");
+		            return;
+	            }
+
+                // capture RGB image
+	            uchar3* imgRGB = NULL;
+                
+                time_start_cam = transferor_get_time_sec();
+                // Capture(T** image, uint64 timeout=UINT64_MAX) -
+	            if( !((Video_IP_resouce *)video_IP_resouce)->input->Capture(&imgRGB, 1000) ){
+		            printf("detectnet-camera:  failed to capture RGB image from camera\n");
+                }
+                time_end_cam = transferor_get_time_sec();
+                time_cam_interval =  time_end_cam - time_start_cam;
+                //transferor_writeCameraIntervalTime(std::to_string(time_cam_interval));
+                //saveImage("capture.jpg", imgRGB, 1280, 720);
+                if( ((Video_IP_resouce *)video_IP_resouce)->output != NULL && SIGNAL_RECIEVED != true )
+	            {
+		            ((Video_IP_resouce *)video_IP_resouce)->output->Render(imgRGB, 
+                                                                        ((Video_IP_resouce *)video_IP_resouce)->input->GetWidth(), 
+                                                                        ((Video_IP_resouce *)video_IP_resouce)->input->GetHeight());
+                    if( !((Video_IP_resouce *)video_IP_resouce)->output->IsStreaming() ){
+			                SIGNAL_RECIEVED = true;
+                    }
+	            }
+                
+               /* CUDA(cudaNormalize((float4*)imgRGB, make_float2(0,255),
+                                       (float4*)imgRGB, make_float2(0,1),
+                                        width, height));*/
+              //  CUDA(cudaDeviceSynchronize());
+                if(imgRGB != NULL){
+                    double time_start_CV = transferor_get_time_sec();
+
+                    cv::Mat cv_image(cv::Size(width, height), CV_8UC3);
+                    cv::Mat cv_image2(cv::Size(width, height), CV_8UC3, imgRGB);
+                    cv::cvtColor(cv_image2, cv_image, cv::COLOR_RGB2BGR);
+                    
+                    //save jpg as file ,named with time
+                   /* std::chrono::system_clock::time_point endTime = std::chrono::system_clock::now();
+                    long long time = std::chrono::duration_cast<std::chrono::milliseconds>(endTime.time_since_epoch()).count();
+                    std::string time_string = std::to_string(time);
+                    std::string filename = "Image-" + time_string + ".jpg";
+                    cv::imwrite(".jpg", cv_image);*/
+
+                    std::vector<uchar> encodedjpg;
+                    cv::imencode(".jpg", cv_image, encodedjpg);
+                    std::string str_encode(encodedjpg.begin(), encodedjpg.end());
+
+                    double time_end_CV = transferor_get_time_sec();
+                    double time_CV_interval =  time_end_CV - time_start_CV;
+                    transferor_writeCV_JPGTime(std::to_string(time_CV_interval));
+
+                    send_jpgStream(socket, str_encode,time_cam_interval, uint32_ip, port);
+                    /*
+	                * check byte code in sting
+	                *//*
+                    std::string str_buffer;
+	                for(int j = 0; j < str_encode.length(); j++){
+                            char code_buffer [10];
+                            sprintf(&code_buffer[0], "0x%02X ", str_encode[j]);
+                            std::string strbuff(code_buffer);
+                    		str_buffer.append(strbuff);
+                    }
+	                std::cout << str_buffer << std::endl;*/
+                }
+            }
+        } 
+    } 
+    return;
+}
+
+void send_jpgStream(Socket* socket, std::string str_encode, double time_cam_interval, uint32_t ip, uint16_t port){
+     int imageSize = str_encode.length();
+     double send_time = transferor_get_time_sec(); 
+     std::string timestamp_pack;
+
+     timestamp_pack.append(std::to_string(send_time));
+     timestamp_pack.append("-");
+     timestamp_pack.append(std::to_string(time_cam_interval));
+     timestamp_pack.append("-");
+     timestamp_pack.append(std::to_string(imageSize));
+     timestamp_pack.append("\n");
+     //std::cout << timestamp_pack << std::endl;
+     
+	 char* tmp_charArray = const_cast<char*>(timestamp_pack.c_str());
+     socket->Send(tmp_charArray, timestamp_pack.length(), ip, port);
+
+
+     tmp_charArray = const_cast<char*>(str_encode.c_str());
+     socket->Send(tmp_charArray, imageSize, ip, port);
+
+}
 int transfer_image(const char* imgPath, char* ipAddress, uint16_t port){
 	/*
 	 * load input images
@@ -26,9 +182,7 @@ int transfer_image(const char* imgPath, char* ipAddress, uint16_t port){
 		return 0;
 	}*/
 
-	/*
-	 *  read file fstream
-	 */
+
 	std::string filename = create_image_filename();
 	//std::string filename = std::to_string(imgPath);
 

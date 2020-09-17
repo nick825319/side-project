@@ -27,7 +27,7 @@ SOFTWARE.
 #include <termios.h>
 #include <time.h>
 #include <JHPWMPCA9685.h>
-
+#include <iostream>
 //GPIO
 #include <errno.h>
 #include <fcntl.h>
@@ -37,6 +37,7 @@ SOFTWARE.
 
 #include <pthread.h>
 #include <pwmCtl.h>
+#include <chrono>
 
 #include <tuple>
 extern int g_detecting_person;
@@ -48,13 +49,85 @@ extern float g_object_width;
 extern float g_object_high;
 
 
-int duty_cycle = 4095 ;
+int duty_cycle = 4090 ;
+// 9V/6V = 1.5  4095/x=1.5 x = 2730
+// max : 4095
 const char N1[] = "200";
 const char N2[] = "38";
 const char N3[] = "76";
 const char N4[] = "12";
 const std::tuple<float, float> zoreTuple = {0.0, 0.0};
 
+void* reverseRoute_stop(void* ){
+    PCA9685 *pca9685 = new PCA9685() ;
+    int err = pca9685->openPCA9685();
+    std::cout << "set all gpio \n";
+    setmap_all();
+    Direction enum_dir;
+ 
+    if(check_PCA9685Error(err, pca9685)){
+        printf("PCA9685 Device Address: 0x%02X\n",pca9685->kI2CAddress) ;
+        pca9685->setAllPWM(0,0) ;
+        pca9685->reset() ;
+        pca9685->setPWMFrequency(60) ;
+
+        float speed_ratio = 0;
+        float decelerate = 0;
+        float cur_speed = 0;
+
+        int change_1 = 1;
+        int change_2 = 1;
+	    //forward  5 sec
+	    set_forward_GPIO_valt();
+        speed_ratio = 1;
+	    pca9685->setPWM(0, 0, (float)duty_cycle*speed_ratio);
+        pca9685->setPWM(1, 0, (float)duty_cycle*speed_ratio);
+	    int delta = 5;
+	    std::chrono::system_clock::time_point firstTime = std::chrono::system_clock::now();
+	    while(delta > 0 ){
+		    delta = 3;
+		    std::chrono::system_clock::time_point secTime = std::chrono::system_clock::now();
+		    delta -= std::chrono::duration_cast<std::chrono::seconds>(secTime - firstTime).count();
+		    std::cout << "forward delta cout:" << delta << std::endl;
+	    }
+	    speed_ratio = 0.6;
+        while(true)
+        {  
+	    	
+            set_back_GPIO_valt();
+            char input_c = getkey();
+            if(input_c == 'w'){
+                speed_ratio += 0.1;
+                printf("speed_ratio: %02f\n",speed_ratio) ;
+            }
+            if(input_c == 's'){
+                speed_ratio -= 0.1;
+                printf("speed_ratio: %02f\n",speed_ratio) ;
+            }
+            if(input_c == 'q'){
+                pca9685->setPWM(0, 0, (float)0);
+                pca9685->setPWM(1, 0, (float)0);
+                break;
+            }
+            decelerate = envirCam_checkPerson(&change_1, &change_2, 1.0);
+          //  printf("decelerate ! %f \n" , decelerate);
+            if(speed_ratio >= 0){ 
+                speed_ratio = max_check(speed_ratio);
+                cur_speed = speed_ratio - decelerate;
+		if(cur_speed < 0)
+		    cur_speed = 0;
+                printf("cur_speed ! %f \n" , cur_speed);
+                pca9685->setPWM(0, 0, (float)duty_cycle*cur_speed);
+                pca9685->setPWM(1, 0, (float)duty_cycle*cur_speed);
+            }else{
+                speed_ratio = min_check(speed_ratio);
+            }
+        }
+        printf("quit motor control\n");
+    }
+    pca9685->closePCA9685();
+    unmap_all();
+}
 
 void* presonFollow(void* ){
     PCA9685 *pca9685 = new PCA9685() ;
@@ -112,7 +185,7 @@ void* presonFollow(void* ){
                 pca9685->setPWM(1, 0, (float)0);
                 break;
             }
-            decelerate = envirCam_checkPerson(&change_1, &change_2);
+            decelerate = envirCam_checkPerson(&change_1, &change_2, 0.4);
           //  printf("decelerate ! %f \n" , decelerate);
             if(speed_ratio >= 0){ 
                 speed_ratio = max_check(speed_ratio);
@@ -174,11 +247,11 @@ Direction trackObject_direction(){
     }
     return enum_dir;
 }
-float envirCam_checkPerson(int* change_1, int* change_2){
+float envirCam_checkPerson(int* change_1, int* change_2, float p_decelerate){
     float decelerate = 0;
     pthread_mutex_lock(&mute_pi_person);
     if(g_detecting_person == 1){
-        decelerate = 0.6;
+        decelerate = p_decelerate;
         
         if(*change_2 == 1){
             printf("g_detecting_person: %d\n",g_detecting_person) ;
@@ -234,8 +307,8 @@ void* pwmctl_forward(void* ) {
                 pca9685->setPWM(1, 0, (float)0);
                 break;
             }
-            decelerate = envirCam_checkPerson(&change_1, &change_2);
-
+            decelerate = envirCam_checkPerson(&change_1, &change_2, 0.4);
+            
             if(speed_ratio >= 0){ 
                 speed_ratio = max_check(speed_ratio);
                 cur_speed = speed_ratio - decelerate;
@@ -413,7 +486,7 @@ char getkey() {
     return input_char;
 }
 void set_GPIO(const char* BCM_num){
-    sleep(1);
+    usleep(100);
     int fd = open("/sys/class/gpio/export", O_WRONLY);
     if(fd == -1){
         perror("Unable to open /sys/class/gpio/export");
@@ -425,7 +498,7 @@ void set_GPIO(const char* BCM_num){
     }
     close(fd);
     
-    sleep(1);
+    usleep(100000);
     char dir[125] = "/sys/class/gpio/gpio";
     strcat(dir, BCM_num);
     strcat(dir, "/direction");

@@ -22,12 +22,12 @@ ax.set_xlabel('excution')
 ax.set_ylabel('TransferTime(milli_sec)')
 ax.set_title('composer_Jetson_TransferLabelTime')
 average = sum(fdata) / len(fdata)
-plt.yticks(np.arange(0,max(fdata)+average*0.1, average*0.2))
+plt.yticks(np.arange(0,1.5, 0.05))
 
 
-plt.xticks(np.arange(0, len(fdata)+len(fdata)*0.01, len(fdata)/20), rotation=60)
+plt.xticks(np.arange(0, len(fdata)+len(fdata)*0.01, round(len(fdata)/20)), rotation=60)
 ax.plot(fdata, linestyle='-')
-ax.set_ylim(ymin=0,ymax=max(fdata)+average*0.1)
+ax.set_ylim(ymin=0,ymax=1.5)
 plt.savefig('./measure_composer_Jetson_TransferLabelTime.pdf')
 plt.show()
 

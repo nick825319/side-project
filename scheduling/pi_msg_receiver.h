@@ -6,11 +6,13 @@
 typedef struct{
     char* ipAddress;
 	char* PiIpAddress;
+    char* self_WIFI_IpAddress;
 	char* selfIpAddress;
 	uint16_t port;
 	uint16_t model_port;
-	uint16_t listen_port; 
-    bool* listening_port;
+	uint16_t listen_port;
+    uint16_t listen_jpg_stream_port; 
+    bool* listening_port; 
 }IP_repo;
 
 void* piMsgReceive(void* ip_repo);

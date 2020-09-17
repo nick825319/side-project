@@ -6,9 +6,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
-fdata = np.loadtxt('measure_composer_Jetson_TransferLabelTime.txt', delimiter = ' ')
+fdata = np.loadtxt('measure_pi-composer_respondedTime.txt', delimiter = ' ')
 
-fdata = fdata*1000
 # It is necessary to adjust the tick range of the y axis
 # so that
 #   (1) the highest tick is higher than the largest data value, and
@@ -19,16 +18,16 @@ fig = plt.figure(figsize=(10,5))
 ax = fig.add_subplot()
 
 ax.set_xlabel('excution')
-ax.set_ylabel('TransferTime(milli_sec)')
-ax.set_title('composer_Jetson_TransferLabelTime')
+ax.set_ylabel('respondTime(milli_sec)')
+ax.set_title('composer_pi-composer_respondedTime')
+
+fdata = fdata*1000
 average = sum(fdata) / len(fdata)
-plt.yticks(np.arange(0,max(fdata)+average*0.1, average*0.2))
-
-
+plt.yticks(np.arange(0,max(fdata)+average*0.1, 30))
 plt.xticks(np.arange(0, len(fdata)+len(fdata)*0.01, len(fdata)/20), rotation=60)
 ax.plot(fdata, linestyle='-')
 ax.set_ylim(ymin=0,ymax=max(fdata)+average*0.1)
-plt.savefig('./measure_composer_Jetson_TransferLabelTime.pdf')
+
+
+plt.savefig('./measure_pi-composer_respondedTime.pdf')
 plt.show()
-
-

@@ -47,12 +47,13 @@ void unmap_GPIO(const char* BCM_num);
 bool is_closePerson();
 float max_check(float value);
 float min_check(float value);
-float envirCam_checkPerson(int* change_1, int* change_2);
+float envirCam_checkPerson(int* change_1, int* change_2, float p_decelerate);
 
 void* pwmctl_forward(void* );
 int pwmctl_byChar();
 Direction trackObject_direction();
 void* presonFollow(void* );
+void* reverseRoute_stop(void* );
 
 bool check_PCA9685Error(int errorCode, PCA9685 *pca9685);
 

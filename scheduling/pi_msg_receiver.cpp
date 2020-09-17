@@ -7,7 +7,8 @@
 #include <list>
 extern int g_detecting_person;
 extern pthread_mutex_t mute_pi_person;
-
+extern bool g_server_connected;
+extern bool g_useWifi;
 std::list<std::string> decode_packet(std::string content){
     //std::string content = "451236.1648-0.02321616-bird0.23";
     int count = 0;
@@ -57,8 +58,6 @@ void piMsgReceive_writeTransferLabelTime(std::string content){
 	file.write(writed_string.data(), writed_string.length());
     file.close();
 }
-
-
 void* piMsgReceive(void* ip_repo){
     // create socket
     /*
@@ -71,10 +70,15 @@ void* piMsgReceive(void* ip_repo){
     std:: list<std::string> recv_timeLabel;
     while(1){
         socket = socket->Create(SOCKET_TCP);
-        socket->Bind(((IP_repo*)ip_repo)->selfIpAddress, ((IP_repo*)ip_repo)->listen_port);
+        if(!g_useWifi){
+            socket->Bind(((IP_repo*)ip_repo)->selfIpAddress, ((IP_repo*)ip_repo)->listen_port);
+        }else{
+            socket->Bind(((IP_repo*)ip_repo)->self_WIFI_IpAddress, ((IP_repo*)ip_repo)->listen_port);
+        }
         std::cout<<"waiting.composer..."<< std::endl;
         socket->Accept();
         std::cout<<"socket Created"<< std::endl;
+        g_server_connected = true;
 
         int receive_buffersize = 1024;
         uint8_t* buff =  new uint8_t[receive_buffersize];
@@ -88,9 +92,9 @@ void* piMsgReceive(void* ip_repo){
             if(receivesize == 0){
                 break;            
             }
-            double time_afterRecv = get_time_sec();
-
+            
             recv_timeLabel = decode_packet(receive_content);
+            double time_afterRecv = get_time_sec();
 
             double composer_sending_time = std::stod(recv_timeLabel.front());
             recv_timeLabel.pop_front();
@@ -103,18 +107,18 @@ void* piMsgReceive(void* ip_repo){
 
             double label_transfer_time = time_afterRecv-composer_sending_time;
             
-           // double FP_respondTime = pi_composer_respond_time + label_transfer_time;
-           // printf("full path respond time: %.6f \n", FP_respondTime);
-           // printf("label transfer time: %.6f \n", label_transfer_time);
+            double FP_respondTime = pi_composer_respond_time + label_transfer_time;
+            printf("full path respond time: %.6f \n", FP_respondTime);
+            printf("label transfer time: %.6f \n", label_transfer_time);
             
-           // piMsgReceive_writeRespondTime(std::to_string(FP_respondTime));
-           // piMsgReceive_writeTransferLabelTime(std::to_string(label_transfer_time));
+            piMsgReceive_writeRespondTime(std::to_string(FP_respondTime));
+            piMsgReceive_writeTransferLabelTime(std::to_string(label_transfer_time));
 
             std::size_t found = receviceLabel.find("person", 0);
             //critical section
             pthread_mutex_lock(&mute_pi_person);   
             if(found != std::string::npos){
-                //std::cout << "label : " << receviceLabel << std::endl;
+                std::cout << "label : " << receviceLabel << std::endl;
                 g_detecting_person = 1 ;
             }else{
                 g_detecting_person = 0 ;
@@ -130,7 +134,9 @@ void* piMsgReceive(void* ip_repo){
 
             std::string mes_buffer = "GOTLABEL" ;
             char* tmpstring = const_cast<char*>(mes_buffer.c_str());
-		    socket->Send(tmpstring, mes_buffer.length(), static_cast<uint32_t>(std::stoul(((IP_repo*)ip_repo)->ipAddress)), ((IP_repo*)ip_repo)->listen_port);
+		    socket->Send(tmpstring, mes_buffer.length(), 
+                         static_cast<uint32_t>(std::stoul(((IP_repo*)ip_repo)->ipAddress)), 
+                         ((IP_repo*)ip_repo)->listen_port);
 
         }
     }

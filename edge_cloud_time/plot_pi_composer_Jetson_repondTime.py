@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
-fdata = np.loadtxt('measure_end2end_respondedTime.txt', delimiter = ' ')
+fdata = np.loadtxt('measure_pi_composer_Jetson_repondTime.txt', delimiter = ' ')
 
 # It is necessary to adjust the tick range of the y axis
 # so that
@@ -17,15 +17,19 @@ fdata = np.loadtxt('measure_end2end_respondedTime.txt', delimiter = ' ')
 fig = plt.figure(figsize=(10,5))
 ax = fig.add_subplot()
 
+
 ax.set_xlabel('excution')
-ax.set_ylabel('respondTime(sec)')
-ax.set_title('composer_Pi_end2end_respondTime')
+ax.set_ylabel('respondTime(milli_sec)')
+ax.set_title('FullPath_respondTime')
 
-plt.yticks(np.arange(0,max(fdata)+0.05, 0.05))
-
-
-plt.xticks(np.arange(0, 690, 30), rotation=60)
+fdata = fdata*1000
+average = sum(fdata) / len(fdata)
+plt.yticks(np.arange(0,average*2, 5))
+plt.xticks(np.arange(0, len(fdata)+len(fdata)*0.01, len(fdata)/20), rotation=60)
 ax.plot(fdata, linestyle='-')
-ax.set_ylim(ymin=0,ymax=max(fdata)+0.05)
-plt.savefig('./measure_end2end_respondedTime.pdf')
+ax.set_ylim(ymin=0,ymax=average*2)
+
+
+plt.savefig('./measure_pi_composer_Jetson_repondTime.pdf')
 plt.show()
+
