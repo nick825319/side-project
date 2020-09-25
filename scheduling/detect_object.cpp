@@ -31,6 +31,7 @@
 #include <chrono>
 #include <iostream>
 #include <unistd.h>
+#include <fstream>
 
 #include <tuple>
 #include <pthread.h>
@@ -43,7 +44,21 @@ extern std::tuple<float, float> g_objection_center;
 extern pthread_mutex_t mute_objection_center;
 extern float g_object_width;
 extern float g_object_high;
+double  detectobject_get_time_sec(){
+    std::chrono::system_clock::time_point timeNow = std::chrono::system_clock::now();
+    std::chrono::microseconds ms = std::chrono::duration_cast<std::chrono::microseconds>(timeNow.time_since_epoch());
+    return (double)ms.count()/(double)1000000;
+}  
+void detectobject_detect_respondTime(std::string content){
+    std::ofstream file;
+    file.open("measure_detectObject_respondse_Time.txt",std::ofstream::out | std::ofstream::binary | std::ofstream::app);
+    
+    std::string writed_string;
+    writed_string.append(content + "\n");
 
+	file.write(writed_string.data(), writed_string.length());
+    file.close();
+}
 detectNet* load_detectNet(char* modelName, char* dataset_path){
 	/*
 	 * create detect object network
@@ -98,7 +113,7 @@ void* detect(void* detect_resource)
 	const uint32_t overlayFlags = detectNet::OverlayFlagsFromStr(OverlayFlag);
 	
 	float confidence = 0.0f;
-	
+	double time_start_cam = detectobject_get_time_sec();
 	
 	// capture RGBA image
 	uchar3* imgRGBA = NULL;
@@ -127,6 +142,10 @@ void* detect(void* detect_resource)
     g_object_width = 0;
     g_object_high = 0;
     pthread_mutex_unlock(&mute_objection_center);
+
+    double time_end_cam = detectobject_get_time_sec();
+    double time_cam_interval =  time_end_cam - time_start_cam;
+    detectobject_detect_respondTime(std::to_string(time_cam_interval));
 
 	if( numDetections > 0 )
 	{

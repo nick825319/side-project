@@ -157,12 +157,12 @@ void send_jpgStream(Socket* socket, std::string str_encode, double time_cam_inte
      timestamp_pack.append("-");
      timestamp_pack.append(std::to_string(imageSize));
      timestamp_pack.append("\n");
-     //std::cout << timestamp_pack << std::endl;
+     std::cout << "timestamp_pack len:"  << timestamp_pack.length() << std::endl;
      
 	 char* tmp_charArray = const_cast<char*>(timestamp_pack.c_str());
      socket->Send(tmp_charArray, timestamp_pack.length(), ip, port);
 
-
+    std::cout << "imageSize:"  << imageSize << std::endl;
      tmp_charArray = const_cast<char*>(str_encode.c_str());
      socket->Send(tmp_charArray, imageSize, ip, port);
 

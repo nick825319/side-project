@@ -40,14 +40,28 @@ SOFTWARE.
 #include <chrono>
 
 #include <tuple>
+
+#include <signal.h>
+#include "signal_handle.h"
+
 extern int g_detecting_person;
 extern pthread_mutex_t mute_pi_person;
+extern pthread_mutex_t mute_ps4_direct_ctl;
 
 extern std::tuple<float, float> g_objection_center;
 extern pthread_mutex_t mute_objection_center;
 extern float g_object_width;
 extern float g_object_high;
 
+extern int g_ps4_forward;
+extern int g_ps4_back;
+extern int g_ps4_left;
+extern int g_ps4_right;
+extern int g_ps4_stop;
+
+extern int g_ps4_b_left;
+extern int g_ps4_b_down;
+extern int g_ps4_b_right;
 
 int duty_cycle = 4090 ;
 // 9V/6V = 1.5  4095/x=1.5 x = 2730
@@ -57,6 +71,9 @@ const char N2[] = "38";
 const char N3[] = "76";
 const char N4[] = "12";
 const std::tuple<float, float> zoreTuple = {0.0, 0.0};
+
+extern bool STOPSING;
+
 
 void* reverseRoute_stop(void* ){
     PCA9685 *pca9685 = new PCA9685() ;
@@ -77,21 +94,21 @@ void* reverseRoute_stop(void* ){
 
         int change_1 = 1;
         int change_2 = 1;
-	    //forward  5 sec
-	    set_forward_GPIO_valt();
+	//forward  5 sec
+	set_forward_GPIO_valt();
         speed_ratio = 1;
-	    pca9685->setPWM(0, 0, (float)duty_cycle*speed_ratio);
+	pca9685->setPWM(0, 0, (float)duty_cycle*speed_ratio);
         pca9685->setPWM(1, 0, (float)duty_cycle*speed_ratio);
-	    int delta = 5;
-	    std::chrono::system_clock::time_point firstTime = std::chrono::system_clock::now();
-	    while(delta > 0 ){
-		    delta = 3;
-		    std::chrono::system_clock::time_point secTime = std::chrono::system_clock::now();
-		    delta -= std::chrono::duration_cast<std::chrono::seconds>(secTime - firstTime).count();
-		    std::cout << "forward delta cout:" << delta << std::endl;
-	    }
-	    speed_ratio = 0.6;
-        while(true)
+	int delta = 1;
+	std::chrono::system_clock::time_point firstTime = std::chrono::system_clock::now();
+	while(delta > 0 ){
+		delta = 2 ;
+		std::chrono::system_clock::time_point secTime = std::chrono::system_clock::now();
+		delta -= std::chrono::duration_cast<std::chrono::seconds>(secTime - firstTime).count();
+		std::cout << "forward delta cout:" << delta << std::endl;
+	}
+	speed_ratio = 1;
+        while(!STOPSING)
         {  
 	    	
             set_back_GPIO_valt();
@@ -117,8 +134,8 @@ void* reverseRoute_stop(void* ){
 		if(cur_speed < 0)
 		    cur_speed = 0;
                 printf("cur_speed ! %f \n" , cur_speed);
-                pca9685->setPWM(0, 0, (float)duty_cycle*cur_speed);
-                pca9685->setPWM(1, 0, (float)duty_cycle*cur_speed);
+                pca9685->setPWM(0, 0, (float)((duty_cycle*cur_speed)));
+                pca9685->setPWM(1, 0, (float)((duty_cycle*cur_speed)));
             }else{
                 speed_ratio = min_check(speed_ratio);
             }
@@ -128,6 +145,79 @@ void* reverseRoute_stop(void* ){
     pca9685->closePCA9685();
     unmap_all();
 }
+
+void* control_by_ps4(void* ){
+    PCA9685 *pca9685 = new PCA9685() ;
+    int err = pca9685->openPCA9685();
+    std::cout << "set all gpio \n";
+    setmap_all();
+    Direction enum_dir;
+ 
+    if(check_PCA9685Error(err, pca9685)){
+        printf("PCA9685 Device Address: 0x%02X\n",pca9685->kI2CAddress) ;
+        pca9685->setAllPWM(0,0) ;
+        pca9685->reset() ;
+        pca9685->setPWMFrequency(60) ;
+
+        float speed_ratio = 0;
+        float decelerate = 0;
+        float cur_speed = 0;
+        float percentage = 0;
+        while(!STOPSING)
+        {  
+            pthread_mutex_lock(&mute_ps4_direct_ctl);  
+            if(g_ps4_b_left == 1){
+                 g_ps4_b_left = 0;
+                 decelerate += 0.1;
+                 percentage = (1-decelerate)*100;
+                 printf("now decelerate (duty cycle(%f %%)) : %f\n", percentage, decelerate);
+            }
+            if(g_ps4_b_down == 1){
+                 g_ps4_b_down = 0;
+                 decelerate = 0;
+                 percentage = (1-decelerate)*100;
+                 printf("now decelerate (duty cycle(%f %%)) : %f\n", percentage, decelerate);
+            }
+            if(g_ps4_b_right == 1){
+                 g_ps4_b_right = 0;
+                 decelerate -= 0.1;
+                 percentage = (1-decelerate)*100;
+                 printf("now decelerate (duty cycle(%f %%)) : %f\n", percentage, decelerate);
+            }
+            
+            if(g_ps4_forward == 1){
+                 set_forward_GPIO_valt();
+                 speed_ratio = 1;
+            }
+            else if(g_ps4_back == 1){
+                 set_back_GPIO_valt();
+                 speed_ratio = 1;
+            }
+            else if(g_ps4_left == 1){
+                 set_right_GPIO_valt();
+                 speed_ratio = 1;
+            }
+            else if(g_ps4_right == 1){
+                 set_lift_GPIO_valt();
+                 speed_ratio = 1;
+            }
+            else if(g_ps4_stop == 1){
+                 set_stop_GPIO_valt();
+                 speed_ratio = 0;
+            }
+            pthread_mutex_unlock(&mute_ps4_direct_ctl);
+            decelerate = max_check(decelerate);
+            decelerate = min_check(decelerate);
+            speed_ratio -= decelerate;
+            pca9685->setPWM(0, 0, (float)duty_cycle*speed_ratio);
+            pca9685->setPWM(1, 0, (float)duty_cycle*speed_ratio);
+        }
+        printf("quit motor control\n");
+    }
+    pca9685->closePCA9685();
+    //unmap_all();
+}
+
 
 void* presonFollow(void* ){
     PCA9685 *pca9685 = new PCA9685() ;
@@ -230,8 +320,8 @@ Direction trackObject_direction(){
     if(g_objection_center != zoreTuple ){
         x_centralPoint = std::get<0>(g_objection_center);
         y_centralPoint = std::get<1>(g_objection_center);
-       // printf("x_centralPoint: %02f\n",x_centralPoint) ;
-      //  printf("y_centralPoint: %02f\n",y_centralPoint) ;
+        //printf("x_centralPoint: %02f\n",x_centralPoint) ;
+        //printf("y_centralPoint: %02f\n",y_centralPoint) ;
     }
     pthread_mutex_unlock(&mute_objection_center);
     if(g_object_width != 0 ){
@@ -282,7 +372,7 @@ void* pwmctl_forward(void* ) {
         pca9685->setAllPWM(0,0) ;
         pca9685->reset() ;
         pca9685->setPWMFrequency(60) ;
-        float speed_ratio = 0;
+        float speed_ratio = 1;
         float decelerate = 0;
         float cur_speed = 0;
         /*
@@ -450,12 +540,18 @@ void set_forward_GPIO_valt(){
 }
 void set_lift_GPIO_valt(){
     set_GPIO_value_low(N1);
-    set_GPIO_value_low(N2);
+    set_GPIO_value_high(N2);
     set_GPIO_value_high(N3);
     set_GPIO_value_low(N4);
 }
 void set_right_GPIO_valt(){
     set_GPIO_value_high(N1);
+    set_GPIO_value_low(N2);
+    set_GPIO_value_low(N3);
+    set_GPIO_value_high(N4);
+}
+void set_stop_GPIO_valt(){
+    set_GPIO_value_low(N1);
     set_GPIO_value_low(N2);
     set_GPIO_value_low(N3);
     set_GPIO_value_low(N4);

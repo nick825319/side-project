@@ -1,5 +1,5 @@
-file(GLOB schedulingSources *.cpp)
-file(GLOB schedulingIncludes *.h )
+file(GLOB schedulingSources *.cpp *.cc)
+file(GLOB schedulingIncludes *.h *.hh)
 message("-- schedulingSources:  ${schedulingSources}")
 message("-- schedulingIncludes:  ${schedulingIncludes}")
 

@@ -21,6 +21,7 @@
  */
 
 #include "scheduling.h"
+#include "joystick.hh"
 
 #include "camera_capture.h"
 #include "signal_handle.h"
@@ -51,9 +52,9 @@
 	#define IS_HEADLESS() (const char*)NULL
 #endif
 
-#define isOpenCam  1
-#define isOpenDisplay 1
-#define isLoadNet  0
+#define isOpenCam  0
+#define isOpenDisplay 0
+#define isLoadNet 0
 #define isOutput_responseTime 0
 
 #define isimageCapture 0
@@ -62,11 +63,13 @@
 #define isdelete_image 0
 #define isclassify 0
 #define isdetect 0
-#define ispiMsgReceive 1
-#define ismotorCtl 0
-#define isimgStream_serv 1
+#define ispiMsgReceive 0
+#define ismotorCtl 1
+#define isimgStream_serv 0
 
-#define useWifi 0
+#define isps4Controller 1
+
+#define useWifi 1
 bool SIGNAL_RECIEVED = false;
 
 
@@ -85,8 +88,19 @@ float g_object_width = 0;
 float g_object_high = 0;
 bool g_server_connected = false;
 bool g_useWifi = false;
+
+int g_ps4_forward = 0;
+int g_ps4_back = 0;
+int g_ps4_left = 0;
+int g_ps4_right = 0;
+int g_ps4_stop = 0;
+int g_ps4_b_left = 0;
+int g_ps4_b_down = 0;
+int g_ps4_b_right = 0;
+
 pthread_mutex_t mute_pi_person = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mute_objection_center = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mute_ps4_direct_ctl = PTHREAD_MUTEX_INITIALIZER;
 
 
 void signHandler(int dummy){
@@ -113,7 +127,9 @@ void release_source(){
 		SAFE_DELETE(g_detect_resource->net);
     }
     if(ismotorCtl == 1){
-        unmap_all();}
+        std::cout << "release GPIO" << std::endl;
+        unmap_all();
+    }
 	std::cout << "stop process, release memory" << std::endl;
 }
 void IP_repo_init(IP_repo* ip_repo){
@@ -130,6 +146,21 @@ void IP_repo_init(IP_repo* ip_repo){
 }
 int main( int argc, char** argv )
 {
+    char* extraargv_0 = "csi://0";
+    char* extraargv_1 = "--input-flip=rotate-180";
+    int newargc = argc+2;
+    char* newargv[newargc];
+    for(int i = 0; i< argc;i++){
+        newargv[i] = argv[i];
+    }
+    newargv[argc] = (char*)malloc(strlen(extraargv_0)+1);
+    newargv[argc] = extraargv_0;
+    newargv[argc+1] = (char*)malloc(strlen(extraargv_1)+1);
+    newargv[argc+1] = extraargv_1;
+    
+    for(int i = 0; i< newargc;i++){
+        std::cout << newargv[i] << std::endl;
+    }
     IP_repo* ip_repo;
     IP_repo_init(ip_repo);
 
@@ -141,9 +172,8 @@ int main( int argc, char** argv )
 	std::chrono::system_clock::time_point endTime;
 
 	if(isOpenCam == 1){	
-		commandLine cmdLine(argc, argv, IS_HEADLESS());
+		commandLine cmdLine(newargc, newargv, IS_HEADLESS());
 		g_detect_resource->input = videoSource::Create(cmdLine, ARG_POSITION(0));
-        g_detect_resource->input->GetOptions().Print();
 		if( !g_detect_resource->input )
 		{
 			LogError("scheduling:  failed to create input stream\n");
@@ -154,6 +184,7 @@ int main( int argc, char** argv )
 		commandLine cmdLine(argc, argv, IS_HEADLESS());
 		g_detect_resource->output = videoOutput::Create(cmdLine, ARG_POSITION(1));
 	}
+
 	if(isLoadNet == 1){
 		g_detect_resource->net = load_detectNet("mb1-ssd.onnx", "./voc-model-label.txt");
 		//net = load_detectNet("ssd-mobilenet.onnx", "./labels.txt");
@@ -174,10 +205,9 @@ int main( int argc, char** argv )
     pthread_t thr_detect;
     pthread_t thr_piMsg;
     pthread_t thr_motor;
+    pthread_t thr_ps4;
     //pthread_create(&thr_detect, NULL, detect, (void *)g_detect_resource);
-    
 
-    
     // task6 - get piCam detection from composer
 	if(ispiMsgReceive == 1){
         pthread_create(&thr_piMsg, NULL, piMsgReceive, (void *)ip_repo);
@@ -188,13 +218,19 @@ int main( int argc, char** argv )
     if(ismotorCtl == 1){
         //pthread_create(&thr_motor, NULL, pwmctl_forward, NULL);
         //pthread_create(&thr_motor, NULL, presonFollow, NULL);
-        pthread_create(&thr_motor, NULL, reverseRoute_stop, NULL);
+        //pthread_create(&thr_motor, NULL, reverseRoute_stop, NULL);
+        pthread_create(&thr_motor, NULL, control_by_ps4, NULL);
 
 	}
-   if(isimgStream_serv == 1){
+    if(isimgStream_serv == 1){
          //task8 - imgStream to composer
          trans_imgStream(g_video_IP_resouce);
-    }       
+    }
+    if(isps4Controller == 1){
+         //task9 - blueTooth ps4
+         printf("get in ps4\n");
+         pthread_create(&thr_ps4, NULL, ps4Controller_run, NULL);
+    }        
     //for(int i=0 ; i<1; i++)
 	while( !SIGNAL_RECIEVED )
 	{
@@ -250,8 +286,9 @@ int main( int argc, char** argv )
 		}
         else{
             break;
-        }
+        }  
 	}
+    pthread_join(thr_motor, NULL);
 	std::cout << "exit - delta :" << delta << std::endl;
     free(ip_repo->listening_port);
     release_source();

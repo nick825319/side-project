@@ -39,6 +39,7 @@ void set_back_GPIO_valt();
 void set_forward_GPIO_valt();
 void set_lift_GPIO_valt();
 void set_right_GPIO_valt();
+void set_stop_GPIO_valt();
 char getkey();
 void set_GPIO(const char* BCM_num);
 void set_GPIO_value_high(const char* BCM_num);
@@ -54,6 +55,7 @@ int pwmctl_byChar();
 Direction trackObject_direction();
 void* presonFollow(void* );
 void* reverseRoute_stop(void* );
+void* control_by_ps4(void* );
 
 bool check_PCA9685Error(int errorCode, PCA9685 *pca9685);
 
