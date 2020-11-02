@@ -24,10 +24,10 @@ ax.set_title('detectObject_respondse_Time')
 
 fdata = fdata*1000
 average = sum(fdata) / len(fdata)
-plt.yticks(np.arange(0,average+average*0.2, 5))
+plt.yticks(np.arange(0,average+average*0.8, 10))
 plt.xticks(np.arange(0, round(len(fdata)+len(fdata)*0.01), len(fdata)/20), rotation=60)
 ax.plot(fdata, linestyle='-')
-ax.set_ylim(ymin=0,ymax=average+average*0.2)
+ax.set_ylim(ymin=0,ymax=average+average*0.8)
 '''
 fdata = fdata*1000
 average = sum(fdata) / len(fdata)
@@ -37,5 +37,5 @@ ax.plot(fdata, linestyle='-')
 ax.set_ylim(ymin=0,ymax=2)
 '''
 
-plt.savefig('./measure_toComposer_timestamp_time(0-1).pdf')
+plt.savefig('./measure_detectObject_respondse_Time.pdf')
 plt.show()
