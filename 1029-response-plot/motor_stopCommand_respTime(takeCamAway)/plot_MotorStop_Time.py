@@ -24,13 +24,13 @@ ax.set_xlabel('dataIndex')
 ax.set_ylabel('response time (millisecond)')
 ax.set_title('Motor Stop response Time')
 average = sum(fdata) / len(fdata)
-plt.yticks(np.arange(0,max(fdata) + average, 0.5))
+plt.yticks(np.arange(0, 300, 20))
 
 
 #x_step = round((len(fdata)/20)/10)*10
 plt.xticks(np.arange(0, len(fdata)+len(fdata)*0.01, 5), rotation=60)
 ax.plot(fdata, linestyle='-')
-ax.set_ylim(ymin=0,ymax=max(fdata)+ average)
+ax.set_ylim(ymin=0,ymax=300)
 plt.savefig('./measure_fullpath_time_noPTP.pdf')
 plt.show()
 

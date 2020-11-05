@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
-fdata = np.loadtxt('measure_fullPathTime_byPi.txt', delimiter = ' ')
+fdata = np.loadtxt('measure_fullPathTime_byPi_filted.txt', delimiter = ' ')
 
 fdata = fdata * 1000 #to millisecond
 
@@ -31,6 +31,6 @@ x_step = round((len(fdata)/20)/10)*10
 plt.xticks(np.arange(0, len(fdata)+len(fdata)*0.01, x_step), rotation=60)
 ax.plot(fdata, linestyle='-')
 ax.set_ylim(ymin=100,ymax=500)
-plt.savefig('./measure_fullpath_time_noPTP.pdf')
+plt.savefig('./measure_fullPathTime_byPi_filte.pdf')
 plt.show()
 
